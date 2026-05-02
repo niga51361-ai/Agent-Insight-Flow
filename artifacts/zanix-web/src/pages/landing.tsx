@@ -88,6 +88,14 @@ function LanguageSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: Lang
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = LANGS[lang];
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -98,56 +106,83 @@ function LanguageSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: Lang
   }, []);
 
   return (
-    <div ref={ref} className="relative">
-      <motion.button
-        whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass border border-white/10 hover:border-primary/30 hover:bg-primary/8 text-white/55 hover:text-white transition-all text-xs font-semibold"
-        title="Change language"
-        aria-label="Language selector"
-      >
-        <Globe className="w-3.5 h-3.5" />
-        <span className="hidden sm:block">{current.flag} {current.label}</span>
-        <span className="sm:hidden text-base">{current.flag}</span>
-        <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", open && "rotate-180")} />
-      </motion.button>
-
+    <>
+      {/* Mobile full-screen overlay backdrop */}
       <AnimatePresence>
-        {open && (
+        {open && isMobile && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.96 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 top-full mt-2 w-48 glass-elevated border border-white/12 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)] z-50"
-          >
-            <div className="p-1.5 space-y-0.5">
-              {(Object.keys(LANGS) as LangCode[]).map(code => {
-                const l = LANGS[code];
-                const isActive = code === lang;
-                return (
-                  <motion.button
-                    key={code}
-                    whileHover={{ x: isActive ? 0 : 3 }}
-                    onClick={() => { setLang(code); setOpen(false); }}
-                    className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150",
-                      isActive
-                        ? "bg-primary/15 text-primary border border-primary/20"
-                        : "text-white/50 hover:text-white hover:bg-white/5"
-                    )}
-                  >
-                    <span className="text-base leading-none">{l.flag}</span>
-                    <span className={l.dir === "rtl" ? "font-arabic" : ""}>{l.label}</span>
-                    {isActive && <Check className="w-3 h-3 ml-auto text-primary" />}
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
+            key="lang-backdrop"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] sm:hidden"
+          />
         )}
       </AnimatePresence>
-    </div>
+
+      <div ref={ref} className="relative z-[201]">
+        <motion.button
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl glass border border-white/10 hover:border-primary/30 hover:bg-primary/8 text-white/55 hover:text-white transition-all text-xs font-semibold"
+          aria-label="Language selector"
+        >
+          <Globe className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:block">{current.flag} {current.label}</span>
+          <span className="sm:hidden text-sm leading-none">{current.flag}</span>
+          <ChevronDown className={cn("w-3 h-3 transition-transform duration-200 shrink-0", open && "rotate-180")} />
+        </motion.button>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: isMobile ? 16 : -6, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: isMobile ? 16 : -6, scale: 0.95 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(
+                "glass-elevated border border-white/12 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] z-[202]",
+                isMobile
+                  ? "fixed left-3 right-3 bottom-4 w-auto"
+                  : "absolute right-0 top-full mt-2 w-52"
+              )}
+            >
+              {/* Mobile header */}
+              {isMobile && (
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
+                  <p className="text-xs font-bold text-white/50 uppercase tracking-widest">اختر اللغة</p>
+                  <button onClick={() => setOpen(false)} className="text-white/30 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              <div className={cn("p-1.5 space-y-0.5", isMobile && "p-2 grid grid-cols-2 gap-1 space-y-0")}>
+                {(Object.keys(LANGS) as LangCode[]).map(code => {
+                  const l = LANGS[code];
+                  const isActive = code === lang;
+                  return (
+                    <motion.button
+                      key={code}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => { setLang(code); setOpen(false); }}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150",
+                        isActive
+                          ? "bg-primary/15 text-primary border border-primary/20"
+                          : "text-white/50 hover:text-white hover:bg-white/6 border border-transparent"
+                      )}
+                    >
+                      <span className="text-base leading-none">{l.flag}</span>
+                      <span className={cn("flex-1 text-left", l.dir === "rtl" ? "font-arabic" : "")}>{l.label}</span>
+                      {isActive && <Check className="w-3 h-3 shrink-0 text-primary" />}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }
 
@@ -373,7 +408,7 @@ function PricingCard({ id, title, subtitle, monthlyPrice, annualPrice, color, gr
       {highlighted && (
         <motion.div
           animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 3, repeat: Infinity }}
+          transition={{ duration: 3, repeat: 9999 }}
           className={cn("absolute inset-0 rounded-3xl pointer-events-none", glowColor)}
         />
       )}
@@ -713,7 +748,7 @@ export default function LandingPage() {
             >
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
               <span className={cn("relative", isRTL ? "font-arabic" : "")}>{t.ctaStart}</span>
-              <motion.div className="relative" animate={{ x: [0, 2, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+              <motion.div className="relative" animate={{ x: [0, 2, 0] }} transition={{ duration: 1.5, repeat: 9999 }}>
                 <ArrowRight className={cn("w-3.5 h-3.5", isRTL && "rotate-180")} />
               </motion.div>
             </motion.button>
@@ -739,12 +774,12 @@ export default function LandingPage() {
           {/* Central glow */}
           <motion.div 
             animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 6, repeat: Infinity }}
+            transition={{ duration: 6, repeat: 9999 }}
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-primary/10 rounded-full blur-[140px]" 
           />
           <motion.div 
             animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 7, repeat: Infinity }}
+            transition={{ duration: 7, repeat: 9999 }}
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[300px] bg-cyan-500/8 rounded-full blur-[100px]" 
           />
         </div>
@@ -806,7 +841,7 @@ export default function LandingPage() {
               whileTap={{ scale: 0.95 }}
               className="w-full sm:w-auto px-9 py-4 rounded-2xl glass border border-white/12 hover:border-white/25 hover:bg-white/8 text-white font-bold text-lg transition-all flex items-center justify-center gap-3 group shadow-[0_2px_8px_hsl(260_84%_63%/0.04)]"
             >
-              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
+              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: 9999 }}>
                 <Play className="w-4 h-4 fill-white group-hover:fill-primary transition-colors" />
               </motion.div>
               Watch Demo
@@ -843,7 +878,7 @@ export default function LandingPage() {
           className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/25"
         >
           <span className={cn("text-[11px] uppercase tracking-widest font-medium", isRTL && "font-arabic")}>{t.scroll}</span>
-          <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+          <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: 9999 }}>
             <ChevronDown className="w-4 h-4" />
           </motion.div>
         </motion.div>
@@ -866,7 +901,7 @@ export default function LandingPage() {
             >
               <motion.span 
                 animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                transition={{ duration: 2, repeat: 9999 }}
                 className="w-1.5 h-1.5 rounded-full bg-current shrink-0" 
               />
               {tool.name}
@@ -971,7 +1006,7 @@ export default function LandingPage() {
                       ],
                       scale: [1, 1.02, 1]
                     }}
-                    transition={{ duration: 3, repeat: Infinity }}
+                    transition={{ duration: 3, repeat: 9999 }}
                     className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-primary/15 border border-primary/30 text-sm font-bold"
                   >
                     <Brain className="w-4 h-4 text-primary/90" />
