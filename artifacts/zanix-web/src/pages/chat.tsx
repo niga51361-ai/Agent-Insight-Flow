@@ -14,6 +14,7 @@ import {
   Paperclip, Mic, X,
   Hash, Workflow, ChevronUp,
   Maximize2, Play, Image as ImageIcon,
+  File as FileIcon, UploadCloud,
 } from "lucide-react";
 import {
   useGetMe, useLogout, useCreateSession, useListSessions,
@@ -35,10 +36,20 @@ interface TraceStep {
   duration?: number;
 }
 
+interface Attachment {
+  id: string;
+  name: string;
+  type: "image" | "file";
+  dataUrl: string;
+  mimeType: string;
+  size: number;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  attachments?: Attachment[];
   steps?: TraceStep[];
   isStreaming?: boolean;
   taskId?: string;
@@ -308,74 +319,132 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   );
 }
 
+// ─── Attachment preview chip ──────────────────────────────────────
+function AttachChip({ att, onRemove }: { att: Attachment; onRemove?: () => void }) {
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.88, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.88, y: 4 }} transition={{ duration: 0.18 }}
+      className="relative group/chip shrink-0">
+      {att.type === "image" ? (
+        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/12 bg-white/5">
+          <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+          {onRemove && (
+            <button onClick={onRemove}
+              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 border border-white/20 flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity">
+              <X className="w-2.5 h-2.5 text-white" />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/5 border border-white/10 max-w-[140px]">
+          <FileIcon className="w-3.5 h-3.5 text-white/40 shrink-0" />
+          <span className="text-[10px] text-white/50 truncate">{att.name}</span>
+          {onRemove && (
+            <button onClick={onRemove} className="text-white/25 hover:text-white/70 transition-colors shrink-0 ml-0.5">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 // ─── Message bubble ───────────────────────────────────────────────
 function MessageBubble({ msg, onShowTrace, activeTraceId }: {
   msg: Message; onShowTrace: (id: string) => void; activeTraceId: string | null;
 }) {
   const isUser  = msg.role === "user";
   const hasSteps = (msg.steps?.length ?? 0) > 0 || msg.isStreaming;
+  const images = msg.attachments?.filter(a => a.type === "image") ?? [];
+  const files  = msg.attachments?.filter(a => a.type === "file")  ?? [];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 14, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className={cn("flex gap-2.5 sm:gap-3 px-3 sm:px-5 py-2 group", isUser ? "flex-row-reverse" : "flex-row")}
     >
       {/* Avatars */}
       {!isUser && (
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-primary/25 to-cyan-500/15 border border-primary/25 flex items-center justify-center shrink-0 mt-1 shadow-[0_0_16px_hsl(260_84%_63%/0.2)]">
-          <ZanixLogo size={16} />
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-primary/30 to-cyan-500/20 border border-primary/30 flex items-center justify-center shrink-0 mt-1 shadow-[0_0_20px_hsl(260_84%_63%/0.25),0_0_0_1px_hsl(260_84%_63%/0.1)]">
+          <ZanixLogo size={18} />
         </div>
       )}
       {isUser && (
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shrink-0 mt-1 shadow-[0_2px_12px_rgba(139,92,246,0.3)] text-xs font-bold text-white">
-          ك
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 mt-1 shadow-[0_2px_14px_rgba(139,92,246,0.35)] text-xs font-bold text-white select-none">
+          أ
         </div>
       )}
 
-      <div className={cn("flex flex-col max-w-[85%] sm:max-w-[80%]", isUser ? "items-end" : "items-start")}>
-        <div className={cn(
-          "relative rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm leading-relaxed",
-          isUser
-            ? "bg-gradient-to-br from-primary to-violet-600 text-white rounded-tr-sm shadow-[0_4px_20px_hsl(260_84%_63%/0.3)]"
-            : "bg-white/[0.055] border border-white/8 text-white/90 rounded-tl-sm backdrop-blur-sm"
-        )}>
-          {msg.isStreaming && !msg.content ? (
-            <TypingDots />
-          ) : (
-            <div className="prose prose-sm max-w-none prose-invert">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  code({ className, children }) {
-                    if (className?.includes("language-")) return <CodeBlock className={className}>{children}</CodeBlock>;
-                    return <code className="bg-white/12 px-1.5 py-0.5 rounded-md text-[12px] font-mono text-cyan-300">{children}</code>;
-                  },
-                  img({ src, alt }) {
-                    if (!src) return null;
-                    return <InlineImage src={src} alt={alt} />;
-                  },
-                  table({ children }) {
-                    return <div className="overflow-x-auto my-3 rounded-xl border border-white/8"><table className="border-collapse w-full text-xs">{children}</table></div>;
-                  },
-                  th({ children }) { return <th className="border-b border-white/10 px-4 py-2.5 bg-white/5 font-semibold text-white/80 text-left">{children}</th>; },
-                  td({ children }) { return <td className="border-b border-white/5 px-4 py-2 text-white/65 last:border-0">{children}</td>; },
-                  blockquote({ children }) { return <blockquote className="border-l-2 border-primary/50 pl-4 text-white/55 italic my-2">{children}</blockquote>; },
-                  a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">{children}</a>; },
-                }}
-              >{msg.content}</ReactMarkdown>
-            </div>
-          )}
-          {msg.isStreaming && msg.content && (
-            <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.6, repeat: 9999 }}
-              className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle" />
-          )}
-        </div>
+      <div className={cn("flex flex-col max-w-[85%] sm:max-w-[80%] gap-1.5", isUser ? "items-end" : "items-start")}>
+
+        {/* Attached images grid */}
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {images.map(img => (
+              <div key={img.id} className="w-32 h-28 sm:w-40 sm:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 shadow-lg">
+                <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {files.map(f => (
+              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-xs text-white/55">
+                <FileIcon className="w-3.5 h-3.5 text-white/35 shrink-0" />
+                <span className="max-w-[100px] truncate">{f.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Message content */}
+        {(msg.content || msg.isStreaming) && (
+          <div className={cn(
+            "relative rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm leading-relaxed",
+            isUser
+              ? "bg-gradient-to-br from-primary to-violet-600 text-white rounded-tr-sm shadow-[0_4px_24px_hsl(260_84%_63%/0.3)]"
+              : "bg-white/[0.055] border border-white/8 text-white/90 rounded-tl-sm backdrop-blur-sm"
+          )}>
+            {msg.isStreaming && !msg.content ? (
+              <TypingDots />
+            ) : (
+              <div className="prose prose-sm max-w-none prose-invert">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code({ className, children }) {
+                      if (className?.includes("language-")) return <CodeBlock className={className}>{children}</CodeBlock>;
+                      return <code className="bg-white/12 px-1.5 py-0.5 rounded-md text-[12px] font-mono text-cyan-300">{children}</code>;
+                    },
+                    img({ src, alt }) {
+                      if (!src) return null;
+                      return <InlineImage src={src} alt={alt} />;
+                    },
+                    table({ children }) {
+                      return <div className="overflow-x-auto my-3 rounded-xl border border-white/8"><table className="border-collapse w-full text-xs">{children}</table></div>;
+                    },
+                    th({ children }) { return <th className="border-b border-white/10 px-4 py-2.5 bg-white/5 font-semibold text-white/80 text-left">{children}</th>; },
+                    td({ children }) { return <td className="border-b border-white/5 px-4 py-2 text-white/65 last:border-0">{children}</td>; },
+                    blockquote({ children }) { return <blockquote className="border-l-2 border-primary/50 pl-4 text-white/55 italic my-2">{children}</blockquote>; },
+                    a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">{children}</a>; },
+                  }}
+                >{msg.content}</ReactMarkdown>
+              </div>
+            )}
+            {msg.isStreaming && msg.content && (
+              <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.6, repeat: 9999 }}
+                className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle" />
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className={cn(
-          "flex items-center gap-2 mt-1.5 px-1 transition-all duration-200 opacity-0 group-hover:opacity-100",
+          "flex items-center gap-2 px-1 transition-all duration-200 opacity-0 group-hover:opacity-100",
           isUser ? "flex-row-reverse" : "flex-row"
         )}>
           <span className="text-[10px] text-white/20">
@@ -403,7 +472,7 @@ function MessageBubble({ msg, onShowTrace, activeTraceId }: {
 
         {msg.error && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex items-start gap-2 mt-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs max-w-full">
+            className="flex items-start gap-2 mt-1 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs max-w-full">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             <span dir="auto">{msg.error}</span>
           </motion.div>
@@ -734,12 +803,14 @@ export default function ChatPage() {
   const [useOrchestrate, setUseOrchestrate]       = useState(false);
   const [selectedModel, setSelectedModel]         = useState("gpt-5.2");
   const [showScrollBtn, setShowScrollBtn]         = useState(false);
+  const [attachedFiles, setAttachedFiles]         = useState<Attachment[]>([]);
 
   const bottomRef     = useRef<HTMLDivElement>(null);
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const messagesRef   = useRef<HTMLDivElement>(null);
   const sseRef        = useRef<EventSource | null>(null);
   const liveStepsRef  = useRef<TraceStep[]>([]);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
 
   const user     = (meData as any)?.user;
   const sessions = (sessionsData as any)?.sessions ?? [];
@@ -816,15 +887,40 @@ export default function ChatPage() {
     return sid;
   };
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    files.forEach(file => {
+      if (file.size > 15 * 1024 * 1024) return; // 15MB limit
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        const isImage = file.type.startsWith("image/");
+        setAttachedFiles(prev => [...prev, {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: isImage ? "image" : "file",
+          dataUrl,
+          mimeType: file.type,
+          size: file.size,
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }, []);
+
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || isRunning) return;
+    if ((!text && attachedFiles.length === 0) || isRunning) return;
+    const currentAttachments = [...attachedFiles];
     setInput("");
+    setAttachedFiles([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    const userMsg: Message      = { id: crypto.randomUUID(), role: "user",      content: text, createdAt: new Date() };
+    const userMsg: Message      = { id: crypto.randomUUID(), role: "user", content: text, attachments: currentAttachments, createdAt: new Date() };
     const assistantId           = crypto.randomUUID();
-    const assistantMsg: Message = { id: assistantId,         role: "assistant", content: "", isStreaming: true, createdAt: new Date() };
+    const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true, createdAt: new Date() };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsRunning(true);
@@ -832,8 +928,12 @@ export default function ChatPage() {
 
     try {
       const sid = await ensureSession();
+      const imageDataUrls = currentAttachments.filter(a => a.type === "image").map(a => a.dataUrl);
+      const fileContextParts = currentAttachments.filter(a => a.type === "file").map(a => `[ملف مرفق: ${a.name}]`);
+      const fullGoal = [text, ...fileContextParts].filter(Boolean).join("\n");
+
       if (useOrchestrate) {
-        const res = await orchestrateMutation.mutateAsync({ data: { sessionId: sid, goal: text, maxAgents: 4 } }) as any;
+        const res = await orchestrateMutation.mutateAsync({ data: { sessionId: sid, goal: fullGoal, maxAgents: 4 } }) as any;
         setMessages(prev => prev.map(m =>
           m.id === assistantId
             ? { ...m, content: res.finalAnswer ?? "اكتمل التنسيق.", isStreaming: false, subResults: res.subResults, tokensUsed: res.totalTokensUsed }
@@ -844,7 +944,7 @@ export default function ChatPage() {
         const startRes = await fetch("/api/agent/run/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sid, goal: text, model: selectedModel }),
+          body: JSON.stringify({ sessionId: sid, goal: fullGoal, model: selectedModel, images: imageDataUrls.length > 0 ? imageDataUrls : undefined }),
           credentials: "include",
           cache: "no-store",
         });
@@ -883,7 +983,7 @@ export default function ChatPage() {
     : "محادثة جديدة";
 
   return (
-    <div className="flex h-dvh bg-[hsl(228_22%_4%)] text-white overflow-hidden" dir="rtl">
+    <div className="flex h-dvh bg-transparent text-white overflow-hidden" dir="rtl">
 
       {/* ── Mobile Sidebar Overlay (slides from right for RTL) ─── */}
       <AnimatePresence>
@@ -955,7 +1055,7 @@ export default function ChatPage() {
       <div className="flex flex-col flex-1 min-w-0">
 
         {/* ── Topbar ──────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/6 bg-[hsl(228_22%_4%)]/95 backdrop-blur-sm shrink-0 z-10">
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/6 bg-[hsl(228_22%_5%)]/80 backdrop-blur-xl shrink-0 z-10">
           {/* Mobile menu */}
           <button onClick={() => setMobileSidebarOpen(true)}
             className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center text-white/35 hover:text-white/75 hover:bg-white/6 transition-all shrink-0">
@@ -1021,7 +1121,7 @@ export default function ChatPage() {
         </AnimatePresence>
 
         {/* ── Input area ──────────────────────────────────────── */}
-        <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-3.5 border-t border-white/5 bg-[hsl(228_22%_4%)]/95 backdrop-blur-sm">
+        <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-3.5 border-t border-white/6 bg-[hsl(228_22%_5%)]/80 backdrop-blur-xl">
           <div className="max-w-3xl mx-auto">
             <div className={cn(
               "relative flex flex-col rounded-2xl border transition-all duration-200",
@@ -1029,12 +1129,25 @@ export default function ChatPage() {
                 ? "border-primary/20 bg-primary/3 shadow-[0_0_0_3px_hsl(260_84%_63%/0.06)]"
                 : "border-white/8 bg-white/[0.04] focus-within:border-primary/30 focus-within:bg-white/[0.055] focus-within:shadow-[0_0_0_3px_hsl(260_84%_63%/0.05)]"
             )}>
+              {/* Attachment previews */}
+              <AnimatePresence>
+                {attachedFiles.length > 0 && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                    className="flex flex-wrap gap-2 px-4 pt-3 pb-0 overflow-hidden">
+                    {attachedFiles.map(att => (
+                      <AttachChip key={att.id} att={att} onRemove={() => setAttachedFiles(p => p.filter(a => a.id !== att.id))} />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isRunning ? "الوكيل يعمل…" : "اكتب رسالتك…"}
+                placeholder={isRunning ? "الوكيل يعمل…" : "اكتب رسالتك… (أو أرسل صورة 🖼️)"}
                 disabled={isRunning}
                 rows={1}
                 dir="auto"
@@ -1045,10 +1158,27 @@ export default function ChatPage() {
               <div className="flex items-center justify-between px-2.5 sm:px-3 pb-2.5 gap-2">
                 {/* Left tools */}
                 <div className="flex items-center gap-0.5 sm:gap-1">
-                  <button disabled={isRunning}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/55 hover:bg-white/6 transition-all disabled:opacity-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.txt,.md,.csv,.js,.ts,.py,.json,.html,.css"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isRunning}
+                    title="إرفاق صورة أو ملف"
+                    className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-0",
+                      attachedFiles.length > 0
+                        ? "text-primary bg-primary/10 border border-primary/20"
+                        : "text-white/30 hover:text-white/65 hover:bg-white/6"
+                    )}>
                     <Paperclip className="w-3.5 h-3.5" />
-                  </button>
+                  </motion.button>
                   <button disabled={isRunning}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/55 hover:bg-white/6 transition-all disabled:opacity-0">
                     <Mic className="w-3.5 h-3.5" />
@@ -1070,15 +1200,18 @@ export default function ChatPage() {
                       <span className="hidden sm:block">إيقاف</span>
                     </motion.button>
                   ) : (
-                    <button onClick={sendMessage} disabled={!input.trim()}
+                    <motion.button
+                      whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+                      onClick={sendMessage}
+                      disabled={!input.trim() && attachedFiles.length === 0}
                       className={cn(
                         "w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all",
-                        input.trim()
-                          ? "bg-primary text-white hover:bg-primary/85 shadow-[0_2px_16px_hsl(260_84%_63%/0.4)]"
+                        (input.trim() || attachedFiles.length > 0)
+                          ? "bg-gradient-to-br from-primary to-violet-600 text-white shadow-[0_2px_18px_hsl(260_84%_63%/0.45)]"
                           : "bg-white/5 text-white/15 cursor-not-allowed"
                       )}>
                       <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </button>
+                    </motion.button>
                   )}
                 </div>
               </div>

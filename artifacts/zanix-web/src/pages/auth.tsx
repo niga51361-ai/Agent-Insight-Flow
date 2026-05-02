@@ -175,7 +175,7 @@ export default function AuthPage() {
   ];
 
   return (
-    <div className="min-h-screen flex bg-[hsl(228_22%_4%)] overflow-hidden" dir="rtl">
+    <div className="min-h-screen flex bg-transparent overflow-hidden" dir="rtl">
 
       {/* ── Left panel (shown on right in RTL): Branding ─────── */}
       <div className="hidden lg:flex lg:w-[50%] flex-col relative overflow-hidden order-2">

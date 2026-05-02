@@ -684,7 +684,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden page-enter" dir={t.dir}>
+    <div className="min-h-screen bg-transparent text-foreground overflow-x-hidden page-enter" dir={t.dir}>
       {/* ── Navigation ── */}
       <motion.nav
         initial={{ y: -20, opacity: 0 }}

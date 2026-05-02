@@ -221,7 +221,7 @@ export default function OnboardingPage() {
 
   // ── Auth error ──────────────────────────────────────────────────
   if (authError) return (
-    <div className="min-h-screen bg-[hsl(228_22%_4%)] flex items-center justify-center px-5" dir="rtl">
+    <div className="min-h-screen bg-transparent flex items-center justify-center px-5" dir="rtl">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -242,7 +242,7 @@ export default function OnboardingPage() {
 
   // ── Skeleton ────────────────────────────────────────────────────
   if (initializing) return (
-    <div className="min-h-screen bg-[hsl(228_22%_4%)] flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-transparent flex flex-col" dir="rtl">
       <div className="h-0.5 bg-primary/20" />
       <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-lg px-6 space-y-8 animate-pulse">
@@ -261,7 +261,7 @@ export default function OnboardingPage() {
   const agentDisplayName = data.agentName || "وكيلك";
 
   return (
-    <div className="min-h-screen bg-[hsl(228_22%_4%)] flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-transparent flex flex-col" dir="rtl">
       {/* Ambient background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,hsl(260_84%_63%/0.12),transparent)]" />
