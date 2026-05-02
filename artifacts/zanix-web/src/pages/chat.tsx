@@ -68,37 +68,42 @@ const MODELS = [
   { id: "o4-mini",    label: "Zanix Think", badge: "استنتاج",   dot: "bg-amber-400",    color: "text-amber-400" },
 ];
 
-// ─── Step icons / colors ─────────────────────────────────────────
-function StepIcon({ type }: { type: string }) {
-  const cls = "w-3.5 h-3.5";
-  if (type === "think")      return <Lightbulb className={cls} />;
-  if (type === "search")     return <Search    className={cls} />;
-  if (type === "browse")     return <Globe     className={cls} />;
-  if (type === "code")       return <Code2     className={cls} />;
-  if (type === "shell")      return <Terminal  className={cls} />;
-  if (type === "write_file") return <FileText  className={cls} />;
-  if (type === "read_file")  return <Eye       className={cls} />;
-  if (type === "data")       return <BarChart3 className={cls} />;
-  if (type === "done")       return <Check     className={cls} />;
-  return <Wrench className={cls} />;
-}
-
-function stepColors(type: string) {
-  if (type === "think")      return { text: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   dot: "bg-amber-400" };
-  if (type === "search")     return { text: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/20",    dot: "bg-blue-400" };
-  if (type === "browse")     return { text: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/20",    dot: "bg-cyan-400" };
-  if (type === "code"  || type === "shell")      return { text: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/20",  dot: "bg-violet-400" };
-  if (type === "write_file" || type === "read_file") return { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", dot: "bg-emerald-400" };
-  if (type === "done")       return { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", dot: "bg-emerald-400" };
-  if (type === "data")       return { text: "text-pink-400",    bg: "bg-pink-500/10",    border: "border-pink-500/20",    dot: "bg-pink-400" };
-  return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10", dot: "bg-white/30" };
-}
-
-const STEP_LABELS: Record<string, string> = {
-  think: "تفكير", search: "بحث", browse: "تصفح", code: "كود",
-  shell: "طرفية", write_file: "كتابة ملف", read_file: "قراءة ملف",
-  done: "اكتمل", data: "تحليل بيانات",
+// ─── Step meta ────────────────────────────────────────────────────
+const STEP_META: Record<string, { icon: any; label: string; text: string; bg: string; border: string; glow: string; dot: string }> = {
+  think:       { icon: Lightbulb, label: "تفكير",        text: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/25",   glow: "shadow-amber-500/20",  dot: "bg-amber-400" },
+  search:      { icon: Search,    label: "بحث",           text: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/25",    glow: "shadow-blue-500/20",   dot: "bg-blue-400" },
+  browse:      { icon: Globe,     label: "تصفح الويب",   text: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/25",    glow: "shadow-cyan-500/20",   dot: "bg-cyan-400" },
+  code:        { icon: Code2,     label: "كود",           text: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/25",  glow: "shadow-violet-500/20", dot: "bg-violet-400" },
+  shell:       { icon: Terminal,  label: "طرفية",         text: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/25",  glow: "shadow-violet-500/20", dot: "bg-violet-400" },
+  write_file:  { icon: FileText,  label: "كتابة ملف",    text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/25", glow: "shadow-emerald-500/20",dot: "bg-emerald-400" },
+  read_file:   { icon: Eye,       label: "قراءة ملف",    text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/25", glow: "shadow-emerald-500/20",dot: "bg-emerald-400" },
+  data:        { icon: BarChart3, label: "تحليل بيانات", text: "text-pink-400",    bg: "bg-pink-500/10",    border: "border-pink-500/25",    glow: "shadow-pink-500/20",   dot: "bg-pink-400" },
+  done:        { icon: Check,     label: "اكتمل",         text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/25", glow: "shadow-emerald-500/20",dot: "bg-emerald-400" },
+  tool:        { icon: Wrench,    label: "أداة",          text: "text-primary/80",  bg: "bg-primary/8",      border: "border-primary/20",     glow: "shadow-primary/20",    dot: "bg-primary" },
+  memory:      { icon: Brain,     label: "ذاكرة",         text: "text-rose-400",    bg: "bg-rose-500/10",    border: "border-rose-500/25",    glow: "shadow-rose-500/20",   dot: "bg-rose-400" },
+  image:       { icon: ImageIcon, label: "صورة",          text: "text-orange-400",  bg: "bg-orange-500/10",  border: "border-orange-500/25",  glow: "shadow-orange-500/20", dot: "bg-orange-400" },
 };
+
+function getStepMeta(type: string) {
+  return STEP_META[type] ?? { icon: Wrench, label: type, text: "text-white/45", bg: "bg-white/5", border: "border-white/10", glow: "", dot: "bg-white/30" };
+}
+
+// ─── Live duration counter ────────────────────────────────────────
+function LiveDuration({ startTs }: { startTs?: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!startTs) return;
+    const id = setInterval(() => setElapsed(Date.now() - startTs), 100);
+    return () => clearInterval(id);
+  }, [startTs]);
+  const s = (elapsed / 1000).toFixed(1);
+  return <span className="font-mono text-[9px] text-white/30">{s}s</span>;
+}
+
+function StaticDuration({ ms }: { ms?: number }) {
+  if (!ms) return null;
+  return <span className="font-mono text-[9px] text-white/25">{ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}</span>;
+}
 
 // ─── Copy button ─────────────────────────────────────────────────
 function CopyBtn({ text, size = "sm" }: { text: string; size?: "sm" | "xs" }) {
@@ -129,118 +134,330 @@ function TypingDots() {
   );
 }
 
-// ─── Execution Trace Panel ────────────────────────────────────────
+// ─── Execution Trace ─────────────────────────────────────────────
 function ExecutionTrace({ steps, isRunning, onClose }: { steps: TraceStep[]; isRunning: boolean; onClose: () => void }) {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const [startTime] = useState(() => Date.now());
+  const [totalElapsed, setTotalElapsed] = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
-  const completedCount = steps.filter(s => s.status === "completed").length;
-  const progress = steps.length > 0 ? (completedCount / steps.length) * 100 : 0;
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [steps.length]);
+  const completedCount = steps.filter(s => s.status === "completed").length;
+  const failedCount    = steps.filter(s => s.status === "failed").length;
+  const runningStep    = steps.find(s => s.status === "running");
+  const progress       = steps.length > 0 ? (completedCount / steps.length) * 100 : isRunning ? 5 : 0;
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = setInterval(() => setTotalElapsed(Date.now() - startTime), 200);
+    return () => clearInterval(id);
+  }, [isRunning, startTime]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [steps.length]);
+
+  const totalDuration = totalElapsed > 0 ? totalElapsed : steps.reduce((a, s) => a + (s.duration ?? 0), 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-white/6 shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
-          <Activity className="w-3.5 h-3.5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-white">مسار التنفيذ</p>
+    <div className="flex flex-col h-full bg-[hsl(228_22%_4%)]">
+
+      {/* ── Header ── */}
+      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="relative w-8 h-8 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/25 to-cyan-500/15 border border-primary/25 flex items-center justify-center">
+              <Activity className="w-3.5 h-3.5 text-primary" />
+            </div>
             {isRunning && (
-              <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.2, repeat: 9999 }}
-                className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <motion.div className="absolute inset-0 rounded-xl border border-primary/40"
+                animate={{ scale: [1, 1.25, 1], opacity: [0.6, 0, 0.6] }}
+                transition={{ duration: 1.6, repeat: 9999 }} />
             )}
           </div>
-          <p className="text-[10px] text-white/35">{steps.length} خطوة{completedCount > 0 && ` · ${completedCount} مكتملة`}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-black text-white tracking-tight">مسار التنفيذ</p>
+            <p className="text-[10px] text-white/30 mt-0.5">
+              {isRunning
+                ? <span className="text-emerald-400/80 font-semibold">● مباشر</span>
+                : steps.length > 0 ? "مكتمل" : "في الانتظار"}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/6 transition-all">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button onClick={onClose} className="text-white/25 hover:text-white/60 transition-colors p-1.5 rounded-lg hover:bg-white/6">
-          <X className="w-3.5 h-3.5" />
-        </button>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "الخطوات", value: steps.length, color: "text-white/60" },
+            { label: "مكتملة",  value: completedCount, color: "text-emerald-400" },
+            { label: "الوقت",   value: totalDuration > 0 ? `${(totalDuration / 1000).toFixed(1)}s` : "—", color: "text-cyan-400" },
+          ].map(s => (
+            <div key={s.label} className="flex flex-col items-center py-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+              <span className={cn("text-sm font-black tabular-nums", s.color)}>{s.value}</span>
+              <span className="text-[9px] text-white/25 font-semibold uppercase tracking-wider mt-0.5">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-3 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+          <motion.div
+            className={cn("h-full rounded-full", isRunning
+              ? "bg-gradient-to-r from-primary via-cyan-400 to-primary bg-[length:200%_100%]"
+              : failedCount > 0 ? "bg-gradient-to-r from-primary to-red-400" : "bg-gradient-to-r from-primary to-emerald-400"
+            )}
+            animate={{ width: `${isRunning ? Math.max(progress, 5) : steps.length > 0 ? 100 : 0}%` }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          />
+        </div>
       </div>
 
-      {/* Progress bar */}
-      {steps.length > 0 && (
-        <div className="h-0.5 bg-white/5 shrink-0">
-          <motion.div className="h-full bg-gradient-to-r from-primary to-cyan-400"
-            animate={{ width: `${isRunning ? Math.max(progress, 8) : 100}%` }}
-            transition={{ duration: 0.4 }} />
-        </div>
-      )}
+      {/* ── Timeline ── */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-0 scroll-smooth">
 
-      {/* Steps */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scroll-smooth">
+        {/* Empty state */}
         {steps.length === 0 && !isRunning && (
-          <div className="flex flex-col items-center justify-center h-36 text-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/3 border border-white/6 flex items-center justify-center">
-              <Atom className="w-6 h-6 text-white/15" />
-            </div>
-            <p className="text-xs text-white/20">في انتظار الوكيل…</p>
+          <div className="flex flex-col items-center justify-center h-40 gap-4">
+            <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 8, repeat: 9999, ease: "linear" }}
+              className="w-10 h-10 rounded-2xl border border-white/8 flex items-center justify-center">
+              <Atom className="w-5 h-5 text-white/10" />
+            </motion.div>
+            <p className="text-[11px] text-white/20 text-center">اضغط إرسال لبدء<br/>مسار التنفيذ</p>
           </div>
         )}
+
+        {/* Thinking bootstrap */}
         {isRunning && steps.length === 0 && (
-          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.4, repeat: 9999 }}
-            className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-primary/8 border border-primary/20">
-            <div className="w-4 h-4 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
-            <span className="text-xs text-primary/80">الوكيل يبدأ التفكير…</span>
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-primary/6 border border-primary/18 mt-1">
+            <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin shrink-0" />
+            <div>
+              <p className="text-[11px] font-bold text-primary/80">الوكيل يبدأ التفكير</p>
+              <p className="text-[10px] text-white/25 mt-0.5">تحليل المهمة وتحديد الخطة…</p>
+            </div>
           </motion.div>
         )}
+
+        {/* Steps */}
         <AnimatePresence>
           {steps.map((step, i) => {
-            const c = stepColors(step.type);
+            const meta = getStepMeta(step.type);
+            const Icon = meta.icon;
             const isExp = !!expanded[i];
-            const hasDetail = step.thought || step.toolName || step.observation;
+            const isLive = step.status === "running";
+            const isDone = step.status === "completed";
+            const isFail = step.status === "failed";
+            const hasDetail = !!(step.thought || step.toolName || step.toolInput || step.observation);
+            const isLast = i === steps.length - 1;
+
             return (
-              <motion.div key={i} initial={{ opacity: 0, x: 12, scale: 0.97 }} animate={{ opacity: 1, x: 0, scale: 1 }}
-                transition={{ duration: 0.25 }}>
-                {i > 0 && <div className="ml-5 w-px h-1.5 bg-white/6" />}
-                <button onClick={() => hasDetail && setExpanded(p => ({ ...p, [i]: !p[i] }))}
-                  className={cn("w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border transition-all text-left", c.bg, c.border, hasDetail && "hover:opacity-90 cursor-pointer")}>
-                  <div className={cn("w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border", c.bg, c.border)}>
-                    <span className={c.text}><StepIcon type={step.type} /></span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5 gap-1">
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider shrink-0", c.text)}>
-                        {STEP_LABELS[step.type] ?? step.toolName ?? step.type}
-                      </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {step.status === "running"    && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
-                        {step.status === "completed"  && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                        {hasDetail && <ChevronDown className={cn("w-3 h-3 text-white/30 transition-transform", isExp && "rotate-180")} />}
+              <motion.div key={`${i}-${step.stepIndex}`}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="flex gap-3 pb-0">
+                  {/* ── Timeline rail ── */}
+                  <div className="flex flex-col items-center shrink-0" style={{ width: 28 }}>
+                    {/* Node */}
+                    <div className="relative">
+                      {isLive && (
+                        <motion.div className={cn("absolute inset-0 rounded-full", meta.border.replace("border-", "bg-").replace("/25", "/20"))}
+                          animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+                          transition={{ duration: 1.4, repeat: 9999 }} />
+                      )}
+                      <div className={cn(
+                        "w-7 h-7 rounded-full flex items-center justify-center border-2 relative z-10 transition-all",
+                        isLive ? cn(meta.bg, meta.border, "shadow-md", meta.glow) :
+                        isDone ? "bg-emerald-500/15 border-emerald-500/40" :
+                        isFail ? "bg-red-500/15 border-red-500/40" :
+                        "bg-white/4 border-white/10"
+                      )}>
+                        {isLive
+                          ? <div className={cn("w-2 h-2 rounded-full", meta.dot)} />
+                          : isDone
+                          ? <Check className="w-3 h-3 text-emerald-400" />
+                          : isFail
+                          ? <X className="w-3 h-3 text-red-400" />
+                          : <span className="text-[9px] font-black text-white/20">{i + 1}</span>
+                        }
                       </div>
                     </div>
-                    <p className="text-[11px] text-white/55 leading-relaxed line-clamp-2 text-right" dir="auto">
-                      {step.thought?.slice(0, 90) || step.toolName || "جارٍ المعالجة…"}
-                    </p>
+                    {/* Connector */}
+                    {!isLast && (
+                      <motion.div
+                        className={cn("w-px flex-1 min-h-[16px] mt-1", isDone ? "bg-emerald-500/20" : "bg-white/[0.06]")}
+                        initial={{ scaleY: 0, originY: 0 }}
+                        animate={{ scaleY: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                      />
+                    )}
                   </div>
-                </button>
-                <AnimatePresence>
-                  {isExp && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                      <div className="mx-2 mb-1.5 p-3 rounded-xl bg-black/30 border border-white/6 space-y-2.5 text-[11px]">
-                        {step.thought    && <div><p className="text-[9px] font-bold uppercase tracking-widest text-white/25 mb-1.5">💭 تفكير الوكيل</p><p className="text-white/55 italic leading-relaxed" dir="auto">{step.thought}</p></div>}
-                        {step.toolName   && <div><p className="text-[9px] font-bold uppercase tracking-widest text-white/25 mb-1.5">🔧 الأداة</p><span className="font-mono text-violet-300 bg-violet-500/12 px-2 py-1 rounded-lg border border-violet-500/20 text-[10px]">{step.toolName}</span></div>}
-                        {step.observation && <div><p className="text-[9px] font-bold uppercase tracking-widest text-white/25 mb-1.5">📤 النتيجة</p><p className="text-white/50 leading-relaxed line-clamp-8 text-[10px]" dir="auto">{step.observation}</p></div>}
+
+                  {/* ── Step card ── */}
+                  <div className="flex-1 min-w-0 pb-3">
+                    <button
+                      onClick={() => hasDetail && setExpanded(p => ({ ...p, [i]: !p[i] }))}
+                      className={cn(
+                        "w-full text-right rounded-2xl border transition-all duration-200 overflow-hidden",
+                        isLive
+                          ? cn(meta.bg, meta.border, "shadow-sm", meta.glow, "shadow-sm")
+                          : isDone ? "bg-white/[0.025] border-white/[0.07] hover:border-white/12"
+                          : isFail ? "bg-red-500/5 border-red-500/15"
+                          : "bg-white/[0.02] border-white/[0.05]",
+                        hasDetail && "cursor-pointer"
+                      )}
+                    >
+                      {/* Card top row */}
+                      <div className="flex items-center gap-2.5 px-3 py-2.5">
+                        <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border", meta.bg, meta.border)}>
+                          <Icon className={cn("w-3 h-3", meta.text)} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={cn("text-[10px] font-black uppercase tracking-wider leading-none", isLive ? meta.text : isDone ? "text-white/55" : isFail ? "text-red-400/70" : "text-white/30")}>
+                              {meta.label}{step.toolName && step.toolName !== step.type ? ` · ${step.toolName}` : ""}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isLive && step.timestamp ? <LiveDuration startTs={step.timestamp} /> : <StaticDuration ms={step.duration} />}
+                              {isLive && <motion.div className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 0.8, repeat: 9999 }} />}
+                              {isDone && <Check className="w-3 h-3 text-emerald-400/60" />}
+                              {isFail && <X className="w-3 h-3 text-red-400/60" />}
+                              {hasDetail && <ChevronDown className={cn("w-3 h-3 text-white/20 transition-transform duration-200", isExp && "rotate-180")} />}
+                            </div>
+                          </div>
+                          {(step.thought || step.toolName) && (
+                            <p className={cn("text-[10px] mt-1 leading-relaxed line-clamp-2", isLive ? "text-white/60" : "text-white/35")} dir="auto">
+                              {step.thought?.slice(0, 100) ?? step.toolName}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+
+                      {/* Expanded detail */}
+                      <AnimatePresence>
+                        {isExp && (
+                          <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
+                            transition={{ duration: 0.22, ease: "easeInOut" }} className="overflow-hidden">
+                            <div className="border-t border-white/[0.06] mx-0">
+                              <div className="p-3 space-y-3">
+
+                                {/* Thought */}
+                                {step.thought && (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                      <Lightbulb className="w-3 h-3 text-amber-400/60" />
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-white/25">تفكير الوكيل</span>
+                                    </div>
+                                    <p className="text-[11px] text-white/50 italic leading-relaxed bg-amber-500/4 border border-amber-500/10 rounded-xl p-2.5" dir="auto">
+                                      {step.thought}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Tool + Input */}
+                                {step.toolName && (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                      <Wrench className="w-3 h-3 text-violet-400/60" />
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-white/25">الأداة</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-mono text-[10px] font-bold text-violet-300 bg-violet-500/10 px-2.5 py-1 rounded-lg border border-violet-500/20">
+                                        {step.toolName}
+                                      </span>
+                                    </div>
+                                    {step.toolInput && Object.keys(step.toolInput).length > 0 && (
+                                      <div className="mt-2 relative group">
+                                        <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                          <CopyBtn text={JSON.stringify(step.toolInput, null, 2)} size="xs" />
+                                        </div>
+                                        <pre className="text-[9px] font-mono text-white/40 bg-black/40 border border-white/6 rounded-xl p-2.5 overflow-x-auto max-h-28 leading-relaxed">
+                                          {JSON.stringify(step.toolInput, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Observation */}
+                                {step.observation && (
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <Zap className="w-3 h-3 text-cyan-400/60" />
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-white/25">النتيجة</span>
+                                      </div>
+                                      <CopyBtn text={step.observation} size="xs" />
+                                    </div>
+                                    <p className="text-[10px] text-white/45 leading-relaxed bg-cyan-500/4 border border-cyan-500/10 rounded-xl p-2.5 max-h-36 overflow-y-auto" dir="auto">
+                                      {step.observation}
+                                    </p>
+                                  </div>
+                                )}
+
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             );
           })}
         </AnimatePresence>
-        {isRunning && steps.length > 0 && (
-          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: 9999 }}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/3 border border-white/8 mt-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-[11px] text-white/35">جارٍ تنفيذ الخطوة التالية…</span>
-          </motion.div>
+
+        {/* Next step pending */}
+        {isRunning && steps.length > 0 && !runningStep && (
+          <div className="flex gap-3 items-center pr-1">
+            <div className="w-7 flex justify-center shrink-0">
+              <motion.div className="w-3 h-3 rounded-full bg-primary/20 border border-primary/30"
+                animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 0.9, repeat: 9999 }} />
+            </div>
+            <div className="flex-1 py-2 px-3 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+              <div className="flex items-center gap-2">
+                {[0,1,2].map(j => (
+                  <motion.div key={j} className="w-1 h-1 rounded-full bg-primary/40"
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 0.6, delay: j * 0.15, repeat: 9999 }} />
+                ))}
+                <span className="text-[10px] text-white/25 mr-1">الخطوة التالية…</span>
+              </div>
+            </div>
+          </div>
         )}
+
         <div ref={endRef} />
       </div>
+
+      {/* ── Footer stats (only when done) ── */}
+      {!isRunning && steps.length > 0 && (
+        <div className="shrink-0 px-4 py-3 border-t border-white/[0.05] bg-white/[0.015]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {completedCount > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400/70 font-semibold">
+                  <Check className="w-3 h-3" />{completedCount} مكتملة
+                </span>
+              )}
+              {failedCount > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-red-400/70 font-semibold">
+                  <X className="w-3 h-3" />{failedCount} فشلت
+                </span>
+              )}
+            </div>
+            {totalDuration > 0 && (
+              <span className="text-[10px] text-white/20 font-mono">
+                {(totalDuration / 1000).toFixed(2)}s
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1589,9 +1806,9 @@ export default function ChatPage() {
       <AnimatePresence initial={false}>
         {traceOpen && (
           <motion.aside key="trace"
-            initial={{ width: 0, opacity: 0 }} animate={{ width: 290, opacity: 1 }} exit={{ width: 0, opacity: 0 }}
+            initial={{ width: 0, opacity: 0 }} animate={{ width: 320, opacity: 1 }} exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden md:flex flex-col border-r border-white/6 bg-white/[0.015] overflow-hidden shrink-0"
+            className="hidden md:flex flex-col border-r border-white/6 bg-[hsl(228_22%_4%)] overflow-hidden shrink-0"
           >
             <ExecutionTrace steps={traceSteps} isRunning={isLiveRunning} onClose={() => setTraceOpen(false)} />
           </motion.aside>
