@@ -9,6 +9,7 @@ import AuthPage from "./pages/auth";
 import OnboardingPage from "./pages/onboarding";
 import ChatPage from "./pages/chat";
 import IntegrationsPage from "./pages/integrations";
+import AdminPage from "./pages/admin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/chat" component={ChatPage} />
       <Route path="/chat/:sessionId" component={ChatPage} />
       <Route path="/integrations" component={IntegrationsPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route><Redirect href="/" /></Route>
     </Switch>
   );

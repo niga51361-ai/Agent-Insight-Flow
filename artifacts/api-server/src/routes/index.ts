@@ -9,6 +9,7 @@ import apiKeysRouter from "./apiKeys.js";
 import publicApiRouter from "./publicApi.js";
 import integrationsRouter from "./integrations.js";
 import autonomousTasksRouter from "./autonomousTasks.js";
+import adminRouter from "./admin.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/api-keys", apiKeysRouter);
 router.use("/public-api", publicApiRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/agent/autopilot", autonomousTasksRouter);
+router.use("/admin", adminRouter);
 
 export default router;

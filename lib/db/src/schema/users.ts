@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const planEnum = pgEnum("user_plan", ["free", "pro", "enterprise"]);
 export const personalityEnum = pgEnum("agent_personality", ["analytical", "creative", "friendly", "professional"]);
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -11,15 +12,16 @@ export const usersTable = pgTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   plan: planEnum("plan").default("free").notNull(),
-  
+  role: userRoleEnum("role").default("user").notNull(),
+
   // Onboarding fields
   agentName: text("agent_name"),
   agentPersonality: personalityEnum("agent_personality"),
-  userInterests: text("user_interests"), // JSON stringified array
+  userInterests: text("user_interests"),
   userBackground: text("user_background"),
-  chatBackground: text("chat_background"), // filename/path
+  chatBackground: text("chat_background"),
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

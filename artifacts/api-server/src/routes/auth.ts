@@ -136,6 +136,7 @@ router.get("/me", async (req: Request, res: Response) => {
       email: usersTable.email,
       name: usersTable.name,
       plan: usersTable.plan,
+      role: usersTable.role,
       agentName: usersTable.agentName,
       agentPersonality: usersTable.agentPersonality,
       userInterests: usersTable.userInterests,

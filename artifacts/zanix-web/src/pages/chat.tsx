@@ -544,7 +544,6 @@ function SessionItem({ session, isActive, onClick }: { session: any; isActive: b
 const SETTINGS_TABS = [
   { id: "profile",      label: "الملف الشخصي",  icon: User },
   { id: "models",       label: "النماذج",        icon: Cpu },
-  { id: "api",          label: "مفاتيح API",     icon: Key },
   { id: "integrations", label: "التكاملات",      icon: Puzzle },
   { id: "tools",        label: "الأدوات",        icon: Sliders },
   { id: "appearance",   label: "المظهر",         icon: Palette },
@@ -556,7 +555,6 @@ type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 function SettingsPanel({ user, onClose, onLogout }: { user: any; onClose: () => void; onLogout: () => void }) {
   const [tab, setTab] = useState<SettingsTab>("profile");
-  const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
@@ -686,48 +684,10 @@ function SettingsPanel({ user, onClose, onLogout }: { user: any; onClose: () => 
                   </div>
                 </div>
               ))}
-              <div className="p-4 rounded-2xl bg-amber-500/6 border border-amber-500/15">
-                <p className="text-xs font-semibold text-amber-400/80 mb-1">ملاحظة</p>
-                <p className="text-[11px] text-white/40 leading-relaxed">جميع النماذج تعمل عبر OpenAI API. تحتاج إلى مفتاح API صالح في تبويب "مفاتيح API".</p>
+              <div className="p-4 rounded-2xl bg-emerald-500/6 border border-emerald-500/15">
+                <p className="text-xs font-semibold text-emerald-400/80 mb-1">الحالة</p>
+                <p className="text-[11px] text-white/40 leading-relaxed">جميع النماذج تعمل بشكل كامل عبر Zanix AI. يمكنك الاختيار بينها من شريط الأدوات في المحادثة.</p>
               </div>
-            </div>
-          )}
-
-          {/* ── API Keys ── */}
-          {tab === "api" && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white/80">مفاتيح API</h3>
-              <p className="text-xs text-white/35 leading-relaxed">تُحفظ المفاتيح بشكل مشفر وآمن في البيئة. لا تُشارك مفاتيحك مع أحد.</p>
-              {[
-                { label: "OpenAI API Key",  placeholder: "sk-...",          env: "OPENAI_API_KEY",  status: true,  desc: "لتشغيل النماذج وتوليد الصور" },
-                { label: "Serper API Key",  placeholder: "xxxxxxxx...",     env: "SERPER_API_KEY",  status: true,  desc: "لبحث الويب في الوقت الفعلي" },
-                { label: "Anthropic Key",   placeholder: "sk-ant-...",      env: "ANTHROPIC_KEY",   status: false, desc: "لنماذج Claude (قريباً)" },
-                { label: "Replicate Key",   placeholder: "r8_...",          env: "REPLICATE_KEY",   status: false, desc: "لنماذج توليد الصور المتقدمة" },
-              ].map((key, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">{key.label}</label>
-                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
-                      key.status ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-white/25 bg-white/4 border-white/8")}>
-                      {key.status ? "● مُعيَّن" : "○ غير مُعيَّن"}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={apiKeyVisible ? "text" : "password"}
-                      placeholder={key.placeholder}
-                      defaultValue={key.status ? "••••••••••••••••••••" : ""}
-                      disabled={!key.status && i > 1}
-                      className="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3.5 py-2.5 text-sm text-white/60 placeholder:text-white/20 focus:outline-none focus:border-primary/40 transition-all font-mono text-xs disabled:opacity-30" />
-                  </div>
-                  <p className="text-[10px] text-white/25">{key.desc}</p>
-                </div>
-              ))}
-              <button onClick={() => setApiKeyVisible(p => !p)}
-                className="flex items-center gap-2 text-[11px] text-white/30 hover:text-white/55 transition-colors">
-                <Eye className="w-3.5 h-3.5" />
-                {apiKeyVisible ? "إخفاء المفاتيح" : "إظهار المفاتيح"}
-              </button>
             </div>
           )}
 
@@ -892,10 +852,10 @@ function SettingsPanel({ user, onClose, onLogout }: { user: any; onClose: () => 
   );
 }
 
-function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectSession, onLogout, onIntegrations, onSettings }: {
+function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectSession, onLogout, onIntegrations, onSettings, onAdmin }: {
   user: any; sessions: any[]; currentSessionId: string | null;
   onNewChat: () => void; onSelectSession: (id: string) => void;
-  onLogout: () => void; onIntegrations: () => void; onSettings: () => void;
+  onLogout: () => void; onIntegrations: () => void; onSettings: () => void; onAdmin: () => void;
 }) {
   return (
     <>
@@ -953,6 +913,13 @@ function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectS
           <Layers className="w-3.5 h-3.5" />
           <span>التكاملات</span>
         </button>
+        {user?.role === "admin" && (
+          <button onClick={onAdmin}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-amber-400/50 hover:text-amber-400 hover:bg-amber-500/8 transition-all text-xs border border-transparent hover:border-amber-500/15">
+            <Shield className="w-3.5 h-3.5" />
+            <span>لوحة الإدارة</span>
+          </button>
+        )}
         {user && (
           <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-white/3 border border-white/6 mt-1">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white shrink-0">
@@ -1391,6 +1358,7 @@ export default function ChatPage() {
                 onLogout={() => logoutMutation.mutateAsync().then(() => setLocation("/"))}
                 onIntegrations={() => { setLocation("/integrations"); setMobileSidebarOpen(false); }}
                 onSettings={() => { setSettingsOpen(true); setMobileSidebarOpen(false); }}
+                onAdmin={() => { setLocation("/admin"); setMobileSidebarOpen(false); }}
               />
             </motion.aside>
           </>
@@ -1434,6 +1402,7 @@ export default function ChatPage() {
               onLogout={() => logoutMutation.mutateAsync().then(() => setLocation("/"))}
               onIntegrations={() => setLocation("/integrations")}
               onSettings={() => setSettingsOpen(true)}
+              onAdmin={() => setLocation("/admin")}
             />
           </motion.aside>
         )}
