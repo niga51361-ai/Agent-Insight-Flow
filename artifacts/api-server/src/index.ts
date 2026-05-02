@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduledTaskWorker } from "./workers/scheduledTaskWorker";
+import { loadSecretsIntoCache, loadConfigIntoCache } from "./lib/secretsLoader.js";
 
 const rawPort = process.env["PORT"];
 
@@ -16,7 +17,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+app.listen(port, async (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -24,6 +25,8 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Start the scheduled task worker
+  await loadSecretsIntoCache();
+  await loadConfigIntoCache();
+
   startScheduledTaskWorker();
 });

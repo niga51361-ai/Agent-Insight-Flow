@@ -339,6 +339,11 @@
     transform: translateY(-1px);
   }
 
+  /* ── Admin input base ── */
+  .input-base {
+    @apply w-full bg-white/4 border border-white/8 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-primary/40 transition-all;
+  }
+
   /* ── Streaming cursor ── */
   .streaming-cursor::after {
     content: '▋';

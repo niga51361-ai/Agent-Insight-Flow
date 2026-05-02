@@ -25,3 +25,4 @@ export * from "./scheduledTasks";
 export * from "./apiKeys";
 export * from "./integrations";
 export * from "./autonomousTasks";
+export * from "./platformConfig";
