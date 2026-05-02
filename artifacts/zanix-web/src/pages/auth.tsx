@@ -6,7 +6,7 @@ import {
   Zap, Shield, Cpu, Sparkles, Globe, ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import FeatherLogo from "@/components/feather-logo";
+import ZanixLogo from "@/components/zanix-logo";
 import { useLogin, useRegister, useGetMe } from "@workspace/api-client-react";
 
 // ── Password strength ──────────────────────────────────────────────
@@ -188,7 +188,7 @@ export default function AuthPage() {
             className="flex items-center gap-3 group w-fit"
           >
             <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shadow-[0_0_20px_hsl(260_84%_63%/0.2)]">
-              <FeatherLogo size={22} />
+              <ZanixLogo size={22} />
             </div>
             <span className="text-lg font-bold text-white group-hover:text-primary/90 transition-colors">Zanix</span>
             <ChevronLeft className="w-4 h-4 text-white/20 group-hover:text-primary/50 transition-colors -ml-1" />
@@ -273,7 +273,7 @@ export default function AuthPage() {
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-2 mb-10">
           <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
-            <FeatherLogo size={20} />
+            <ZanixLogo size={20} />
           </div>
           <span className="text-base font-bold text-white">Zanix</span>
         </div>

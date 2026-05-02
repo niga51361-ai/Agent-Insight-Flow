@@ -6,7 +6,7 @@ import {
   Bot, Brain, Smile, Briefcase, Rocket, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import FeatherLogo from "@/components/feather-logo";
+import ZanixLogo from "@/components/zanix-logo";
 
 // ── Constants ─────────────────────────────────────────────────────
 const INTERESTS = [
@@ -286,7 +286,7 @@ export default function OnboardingPage() {
       <header className="relative flex items-center justify-between px-6 md:px-10 py-4 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
-            <FeatherLogo size={18} />
+            <ZanixLogo size={18} />
           </div>
           <span className="text-sm font-bold text-white/70">Zanix</span>
         </div>

@@ -295,6 +295,143 @@ router.get("/tasks/:taskId/artifacts/:artifactId", async (req: Request, res: Res
   res.send(artifact.content);
 });
 
+// ─── SSE: Real-time task streaming ───────────────────────────────────────────
+const sseClients = new Map<string, Set<Response>>();
+
+router.get("/tasks/:taskId/stream", async (req: Request, res: Response) => {
+  const { taskId } = req.params as { taskId: string };
+
+  const [task] = await db
+    .select()
+    .from(agentTasksTable)
+    .where(eq(agentTasksTable.taskId, taskId))
+    .limit(1);
+
+  if (!task) {
+    res.status(404).json({ error: "Task not found" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const send = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Add to SSE clients map
+  if (!sseClients.has(taskId)) sseClients.set(taskId, new Set());
+  sseClients.get(taskId)!.add(res);
+
+  // Send existing steps immediately
+  const existingSteps = await db
+    .select()
+    .from(agentStepsTable)
+    .where(eq(agentStepsTable.taskId, taskId))
+    .orderBy(agentStepsTable.stepIndex);
+
+  for (const step of existingSteps) {
+    send("step", {
+      stepIndex: step.stepIndex,
+      type: step.stepType,
+      thought: step.thought,
+      toolName: step.toolName,
+      toolInput: step.toolInput,
+      observation: step.observation,
+      status: "completed",
+    });
+  }
+
+  if (task.status === "completed" || task.status === "failed") {
+    send("done", { status: task.status, result: task.result, error: task.errorMessage });
+    res.end();
+    return;
+  }
+
+  send("connected", { taskId, status: task.status });
+
+  const keepAlive = setInterval(() => {
+    res.write(": heartbeat\n\n");
+  }, 15000);
+
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    sseClients.get(taskId)?.delete(res);
+    if (sseClients.get(taskId)?.size === 0) sseClients.delete(taskId);
+  });
+});
+
+export function broadcastTaskEvent(taskId: string, event: string, data: unknown) {
+  const clients = sseClients.get(taskId);
+  if (!clients || clients.size === 0) return;
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of clients) {
+    client.write(payload);
+  }
+}
+
+// ─── SSE-powered run endpoint ─────────────────────────────────────────────────
+router.post("/run/stream", async (req: Request, res: Response) => {
+  const parsed = CreateTaskBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request", details: parsed.error });
+    return;
+  }
+
+  const { sessionId, goal } = parsed.data;
+
+  const [session] = await db
+    .select()
+    .from(agentSessionsTable)
+    .where(eq(agentSessionsTable.sessionId, sessionId))
+    .limit(1);
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const taskId = randomUUID();
+  await db.insert(agentTasksTable).values({
+    sessionId,
+    taskId,
+    goal,
+    status: "running",
+  });
+
+  const registry = createDefaultRegistry(sessionId);
+  const memory = new MemoryManager(sessionId);
+  await memory.getAll();
+
+  res.json({ taskId, status: "started" });
+
+  runAgent(taskId, sessionId, goal, registry, memory, (step) => {
+    broadcastTaskEvent(taskId, "step", {
+      stepIndex: step.stepIndex,
+      type: step.stepType,
+      thought: step.thought,
+      toolName: step.toolName,
+      toolInput: step.toolInput,
+      observation: step.observation,
+      status: "completed",
+    });
+  }).then((result) => {
+    broadcastTaskEvent(taskId, "done", {
+      status: result.success ? "completed" : "failed",
+      result: result.result,
+      tokensUsed: result.tokensUsed,
+    });
+  }).catch((err) => {
+    broadcastTaskEvent(taskId, "done", {
+      status: "failed",
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
+});
+
 router.get("/tools", (_req: Request, res: Response) => {
   const registry = createDefaultRegistry();
   const tools = registry.getAll().map((t) => ({
