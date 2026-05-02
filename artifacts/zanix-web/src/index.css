@@ -340,7 +340,23 @@
   }
 
   /* ── Admin input base ── */
-  .input-base {
+  /* ── Scrollbar hide utility ── */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Streaming word fade-in ── */
+@keyframes wordFadeIn {
+  from { opacity: 0; filter: blur(3px); transform: translateY(2px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+.stream-chunk {
+  animation: wordFadeIn 0.22s ease-out both;
+}
+
+.input-base {
     @apply w-full bg-white/4 border border-white/8 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-primary/40 transition-all;
   }
 

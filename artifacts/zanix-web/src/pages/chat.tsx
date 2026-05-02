@@ -6,18 +6,17 @@ import remarkGfm from "remark-gfm";
 import {
   Send, Plus, MessageSquare, LogOut, Menu,
   Terminal, Search, BarChart3, FileText, Brain,
-  ChevronDown, Copy, Check, Activity,
+  ChevronDown, ChevronLeft, Copy, Check, Activity,
   Globe, Code2, AlertCircle, Layers,
-  PanelRight, PanelRightClose,
-  Lightbulb, Eye, Wrench, Atom, Zap,
+  Lightbulb, Eye, Wrench, Zap, Atom, Key,
   Square, Sparkles,
   Paperclip, Mic, X,
   Hash, Workflow, ChevronUp,
   Maximize2, Play, Image as ImageIcon,
-  File as FileIcon, UploadCloud,
-  Settings, User, Key, Puzzle, Cpu,
-  ChevronLeft, ExternalLink, Shield, Bell,
-  Palette, Sliders, Database, Bot,
+  File as FileIcon, Download, Database,
+  Settings, User, Puzzle, Cpu,
+  ExternalLink, Shield, Bell,
+  Palette, Sliders, Bot,
 } from "lucide-react";
 import {
   useGetMe, useLogout, useCreateSession, useListSessions,
@@ -498,40 +497,87 @@ function HtmlPreviewModal({ html, onClose }: { html: string; onClose: () => void
   );
 }
 
-// ─── Code block ───────────────────────────────────────────────────
+// ─── Code block — professional file card ────────────────────────
+const LANG_ICON: Record<string, string> = {
+  python: "🐍", py: "🐍",
+  javascript: "⚡", js: "⚡",
+  typescript: "💙", ts: "💙",
+  tsx: "⚛️", jsx: "⚛️",
+  html: "🌐",
+  css: "🎨",
+  json: "📦",
+  sql: "🗄️",
+  bash: "🖥️", sh: "🖥️", shell: "🖥️",
+  go: "🐹",
+  rust: "🦀",
+  java: "☕",
+  cpp: "⚙️", c: "⚙️",
+  markdown: "📝", md: "📝",
+  yaml: "📋", yml: "📋",
+  xml: "📄",
+};
+
+const LANG_EXT: Record<string, string> = {
+  python: "py", javascript: "js", typescript: "ts",
+  tsx: "tsx", jsx: "jsx", css: "css", json: "json",
+  bash: "sh", shell: "sh", html: "html", sql: "sql",
+  go: "go", rust: "rs", java: "java", cpp: "cpp", c: "c",
+  markdown: "md", yaml: "yml",
+};
+
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
   const [showPreview, setShowPreview] = useState(false);
-  const lang = className?.replace("language-", "") ?? "";
+  const lang = (className?.replace("language-", "") ?? "").toLowerCase();
   const code = String(children).replace(/\n$/, "");
+  const lineCount = code.split("\n").length;
+  const ext = LANG_EXT[lang] ?? lang;
+  const icon = LANG_ICON[lang] ?? "📄";
+  const filename = ext ? `code.${ext}` : "snippet";
   const isHtml = lang === "html" || code.includes("<!DOCTYPE") || code.includes("<html") || code.includes("<!-- zanix-preview -->");
+
+  const handleDownload = () => {
+    const blob = new Blob([code], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   return (
     <>
-      <div className="relative group/code my-3 rounded-xl overflow-hidden border border-white/8">
-        <div className="flex items-center justify-between px-4 py-2 bg-white/[0.04] border-b border-white/6">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+      <div className="relative group/code my-4 rounded-2xl overflow-hidden border border-white/8 shadow-[0_4px_28px_rgba(0,0,0,0.35)] not-prose">
+        {/* File header */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.07]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-[15px] leading-none shrink-0">{icon}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[12px] font-semibold text-white/70 font-mono">{filename}</span>
+              <span className="text-[10px] text-white/28 whitespace-nowrap">{lineCount} سطر</span>
             </div>
-            {lang && <span className="text-[10px] font-mono text-white/30 uppercase">{lang}</span>}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {lang && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/6 border border-white/8 text-white/30 uppercase tracking-wide">
+                {lang}
+              </span>
+            )}
             {isHtml && (
-              <motion.button
-                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                onClick={() => setShowPreview(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/25 text-primary hover:bg-primary/25 transition-all text-[10px] font-bold"
-              >
+              <button onClick={() => setShowPreview(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/12 border border-primary/22 text-primary hover:bg-primary/20 transition-all text-[10px] font-bold">
                 <Play className="w-3 h-3 fill-current" />
                 <span>معاينة</span>
-              </motion.button>
+              </button>
             )}
+            <button onClick={handleDownload} title="تحميل"
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-white/28 hover:text-white/70 hover:bg-white/8 transition-all">
+              <Download className="w-3.5 h-3.5" />
+            </button>
             <CopyBtn text={code} />
           </div>
         </div>
-        <pre className="bg-[hsl(228_25%_3%)] p-4 overflow-x-auto text-[12.5px] leading-relaxed">
-          <code className={cn("font-mono", className)}>{children}</code>
+        {/* Code body */}
+        <pre className="bg-[hsl(228_28%_2.5%)] p-4 overflow-x-auto text-[12.5px] leading-relaxed m-0">
+          <code className={cn("font-mono text-white/78", className)}>{children}</code>
         </pre>
       </div>
       {showPreview && <HtmlPreviewModal html={code} onClose={() => setShowPreview(false)} />}
@@ -570,133 +616,315 @@ function AttachChip({ att, onRemove }: { att: Attachment; onRemove?: () => void 
   );
 }
 
-// ─── Message bubble ───────────────────────────────────────────────
-function MessageBubble({ msg, onShowTrace, activeTraceId }: {
-  msg: Message; onShowTrace: (id: string) => void; activeTraceId: string | null;
-}) {
-  const isUser  = msg.role === "user";
-  const hasSteps = (msg.steps?.length ?? 0) > 0 || msg.isStreaming;
-  const images = msg.attachments?.filter(a => a.type === "image") ?? [];
-  const files  = msg.attachments?.filter(a => a.type === "file")  ?? [];
+// ─── Inline Trace — single step row ─────────────────────────────
+function InlineStepRow({ step, idx }: { step: TraceStep; idx: number }) {
+  const [open, setOpen] = useState(false);
+  const meta = getStepMeta(step.type);
+  const Icon = meta.icon;
+  const isRun = step.status === "running";
+  const isDone = step.status === "completed";
+  const isFail = step.status === "failed";
+  const hasDetail = !!(step.thought || step.toolInput || step.observation);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      className={cn("flex gap-2.5 sm:gap-3 px-3 sm:px-5 py-2 group", isUser ? "flex-row-reverse" : "flex-row")}
+      initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.22, delay: idx * 0.03 }}
     >
-      {/* Avatars */}
-      {!isUser && (
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-primary/30 to-cyan-500/20 border border-primary/30 flex items-center justify-center shrink-0 mt-1 shadow-[0_0_20px_hsl(260_84%_63%/0.25),0_0_0_1px_hsl(260_84%_63%/0.1)]">
-          <ZanixLogo size={18} />
-        </div>
-      )}
-      {isUser && (
-        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center shrink-0 mt-1 shadow-[0_2px_14px_rgba(139,92,246,0.35)] text-xs font-bold text-white select-none">
-          أ
-        </div>
-      )}
-
-      <div className={cn("flex flex-col max-w-[85%] sm:max-w-[80%] gap-1.5", isUser ? "items-end" : "items-start")}>
-
-        {/* Attached images grid */}
-        {images.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-end">
-            {images.map(img => (
-              <div key={img.id} className="w-32 h-28 sm:w-40 sm:h-32 rounded-xl overflow-hidden border border-white/10 bg-white/5 shadow-lg">
-                <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
+      <button
+        onClick={() => hasDetail && setOpen(p => !p)}
+        disabled={!hasDetail}
+        className={cn(
+          "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-all text-right",
+          isRun ? "bg-primary/8 border border-primary/18" : "hover:bg-white/[0.025]",
+          !hasDetail && "cursor-default"
         )}
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-end">
-            {files.map(f => (
-              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-xs text-white/55">
-                <FileIcon className="w-3.5 h-3.5 text-white/35 shrink-0" />
-                <span className="max-w-[100px] truncate">{f.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Message content */}
-        {(msg.content || msg.isStreaming) && (
-          <div className={cn(
-            "relative rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm leading-relaxed",
-            isUser
-              ? "bg-gradient-to-br from-primary to-violet-600 text-white rounded-tr-sm shadow-[0_4px_24px_hsl(260_84%_63%/0.3)]"
-              : "bg-white/[0.055] border border-white/8 text-white/90 rounded-tl-sm backdrop-blur-sm"
-          )}>
-            {msg.isStreaming && !msg.content ? (
-              <TypingDots />
-            ) : (
-              <div className="prose prose-sm max-w-none prose-invert">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    code({ className, children }) {
-                      if (className?.includes("language-")) return <CodeBlock className={className}>{children}</CodeBlock>;
-                      return <code className="bg-white/12 px-1.5 py-0.5 rounded-md text-[12px] font-mono text-cyan-300">{children}</code>;
-                    },
-                    img({ src, alt }) {
-                      if (!src) return null;
-                      return <InlineImage src={src} alt={alt} />;
-                    },
-                    table({ children }) {
-                      return <div className="overflow-x-auto my-3 rounded-xl border border-white/8"><table className="border-collapse w-full text-xs">{children}</table></div>;
-                    },
-                    th({ children }) { return <th className="border-b border-white/10 px-4 py-2.5 bg-white/5 font-semibold text-white/80 text-left">{children}</th>; },
-                    td({ children }) { return <td className="border-b border-white/5 px-4 py-2 text-white/65 last:border-0">{children}</td>; },
-                    blockquote({ children }) { return <blockquote className="border-l-2 border-primary/50 pl-4 text-white/55 italic my-2">{children}</blockquote>; },
-                    a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">{children}</a>; },
-                  }}
-                >{msg.content}</ReactMarkdown>
-              </div>
-            )}
-            {msg.isStreaming && msg.content && (
-              <motion.span animate={{ opacity: [1, 0] }} transition={{ duration: 0.6, repeat: 9999 }}
-                className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle" />
-            )}
-          </div>
-        )}
-
-        {/* Footer */}
+      >
         <div className={cn(
-          "flex items-center gap-2 px-1 transition-all duration-200 opacity-0 group-hover:opacity-100",
-          isUser ? "flex-row-reverse" : "flex-row"
+          "w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border transition-all",
+          isDone ? "bg-emerald-500/15 border-emerald-500/28 text-emerald-400" :
+          isFail ? "bg-red-500/15 border-red-500/28 text-red-400" :
+          isRun  ? "bg-primary/15 border-primary/28 text-primary" :
+                   "bg-white/5 border-white/10 text-white/30"
         )}>
-          <span className="text-[10px] text-white/20">
+          {isDone ? <Check className="w-2.5 h-2.5" /> :
+           isFail ? <X className="w-2.5 h-2.5" /> :
+           isRun  ? <motion.div className="w-2 h-2 rounded-full bg-primary"
+                      animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 0.8, repeat: 9999 }} /> :
+                    <Icon className="w-2.5 h-2.5" />}
+        </div>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span className={cn("text-[11px] font-semibold truncate", meta.text)}>{meta.label}</span>
+          {step.toolName && (
+            <span className="text-[10px] text-white/22 font-mono truncate hidden sm:block">{step.toolName}</span>
+          )}
+        </div>
+        {isRun ? <LiveDuration startTs={step.timestamp} /> : <StaticDuration ms={step.duration} />}
+        {hasDetail && (
+          <ChevronDown className={cn("w-3 h-3 text-white/20 transition-transform shrink-0", open && "rotate-180")} />
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }}
+            className="overflow-hidden mx-2 mb-1">
+            <div className="rounded-xl bg-white/[0.025] border border-white/6 overflow-hidden divide-y divide-white/5">
+              {step.thought && (
+                <div className="px-3 py-2.5">
+                  <p className="text-[9px] text-amber-400/55 font-bold uppercase tracking-wider mb-1.5">تفكير</p>
+                  <p className="text-[11px] text-white/50 leading-relaxed italic">{step.thought}</p>
+                </div>
+              )}
+              {step.toolInput && (
+                <div className="px-3 py-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[9px] text-violet-400/55 font-bold uppercase tracking-wider">المدخلات</p>
+                    <CopyBtn text={JSON.stringify(step.toolInput, null, 2)} size="xs" />
+                  </div>
+                  <pre className="text-[10px] font-mono text-white/42 overflow-x-auto leading-relaxed max-h-24">
+                    {JSON.stringify(step.toolInput, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {step.observation && (
+                <div className="px-3 py-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[9px] text-cyan-400/55 font-bold uppercase tracking-wider">النتيجة</p>
+                    <CopyBtn text={step.observation} size="xs" />
+                  </div>
+                  <p className="text-[11px] text-white/48 leading-relaxed overflow-y-auto max-h-24 whitespace-pre-wrap">{step.observation}</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Inline Trace — collapsible container (Manus-style) ──────────
+function InlineTrace({ steps, isLive }: { steps: TraceStep[]; isLive: boolean }) {
+  const [expanded, setExpanded] = useState(true);
+  const runningStep    = steps.find(s => s.status === "running");
+  const completedCount = steps.filter(s => s.status === "completed").length;
+
+  useEffect(() => {
+    if (!isLive && steps.length > 0) setExpanded(false);
+  }, [isLive]);
+
+  if (steps.length === 0 && !isLive) return null;
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setExpanded(p => !p)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all",
+          isLive
+            ? "bg-primary/8 border-primary/20 text-primary/80 hover:bg-primary/12"
+            : "bg-white/[0.04] border-white/8 text-white/40 hover:text-white/65 hover:bg-white/[0.06]"
+        )}
+      >
+        <Activity className={cn("w-3 h-3 shrink-0", isLive && "text-primary")} />
+        {isLive && runningStep ? (
+          <>
+            <span className="text-primary/70 truncate max-w-[160px]">
+              {getStepMeta(runningStep.type).label}…
+            </span>
+            <div className="flex gap-0.5 shrink-0">
+              {[0, 1, 2].map(j => (
+                <motion.div key={j} className="w-1 h-1 rounded-full bg-primary/50"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 0.9, delay: j * 0.2, repeat: 9999 }} />
+              ))}
+            </div>
+          </>
+        ) : isLive ? (
+          <span className="text-primary/60">جارٍ التفكير…</span>
+        ) : (
+          <span>{steps.length} خطوة{completedCount > 0 ? ` · ${completedCount} مكتملة` : ""}</span>
+        )}
+        <ChevronDown className={cn("w-3 h-3 transition-transform mr-auto shrink-0", expanded && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+            className="overflow-hidden mt-1"
+          >
+            <div className="space-y-0.5 pr-1 border-r-2 border-white/[0.06] mr-1">
+              {steps.map((step, idx) => (
+                <InlineStepRow key={step.stepIndex} step={step} idx={idx} />
+              ))}
+              {isLive && !runningStep && steps.length === 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-2">
+                  {[0, 1, 2].map(j => (
+                    <motion.div key={j} className="w-1.5 h-1.5 rounded-full bg-primary/30"
+                      animate={{ scale: [1, 1.4, 1] }}
+                      transition={{ duration: 0.6, delay: j * 0.15, repeat: 9999 }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Message Row — Claude-style, no bubbles ───────────────────────
+function MessageRow({ msg, liveSteps, activeSseTaskId }: {
+  msg: Message;
+  liveSteps: TraceStep[];
+  activeSseTaskId: string | null;
+}) {
+  const isUser     = msg.role === "user";
+  const isThisLive = !!(msg.isStreaming && msg.taskId && msg.taskId === activeSseTaskId);
+  const steps      = isThisLive ? liveSteps : (msg.steps ?? []);
+  const images     = msg.attachments?.filter(a => a.type === "image") ?? [];
+  const files      = msg.attachments?.filter(a => a.type === "file")  ?? [];
+
+  // ── User message ──
+  if (isUser) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        className="flex justify-end px-4 sm:px-8 py-1.5 group"
+      >
+        <div className="max-w-[80%] sm:max-w-[68%] flex flex-col items-end gap-1.5">
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {images.map(img => (
+                <div key={img.id} className="w-32 h-28 sm:w-44 sm:h-36 rounded-2xl overflow-hidden border border-white/10 bg-white/4 shadow-lg">
+                  <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
+          {files.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {files.map(f => (
+                <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-xs text-white/55">
+                  <FileIcon className="w-3.5 h-3.5 text-white/35 shrink-0" />
+                  <span className="max-w-[110px] truncate">{f.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {msg.content && (
+            <div className="bg-white/[0.08] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm text-white/88 leading-relaxed">
+              <p dir="auto" className="whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          )}
+          <span className="text-[10px] text-white/18 opacity-0 group-hover:opacity-100 transition-opacity pr-1 select-none">
             {msg.createdAt.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}
           </span>
-          {!isUser && <CopyBtn text={msg.content} />}
-          {!isUser && hasSteps && msg.taskId && (
-            <button onClick={() => onShowTrace(msg.taskId!)}
-              className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all border",
-                activeTraceId === msg.taskId
-                  ? "bg-primary/15 border-primary/30 text-primary"
-                  : "bg-white/5 border-white/10 text-white/35 hover:text-white/65 hover:bg-white/8"
-              )}>
-              <Activity className="w-3 h-3" />
-              <span>{msg.steps?.length ?? 0} خطوات</span>
-            </button>
-          )}
-          {!isUser && msg.tokensUsed && (
-            <span className="flex items-center gap-1 text-[10px] text-white/20">
-              <Hash className="w-2.5 h-2.5" /> {msg.tokensUsed.toLocaleString()}
-            </span>
-          )}
         </div>
+      </motion.div>
+    );
+  }
 
+  // ── Assistant message ──
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="flex gap-3 sm:gap-4 px-3 sm:px-6 py-3 group"
+    >
+      {/* Avatar */}
+      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-primary/25 to-cyan-500/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5 shadow-[0_0_16px_hsl(260_84%_63%/0.18)]">
+        <ZanixLogo size={16} />
+      </div>
+
+      {/* Content — free-flowing, no box */}
+      <div className="flex-1 min-w-0 space-y-1 pb-1">
+
+        {/* Inline trace (Manus-style) */}
+        {(isThisLive || steps.length > 0) && (
+          <InlineTrace steps={steps} isLive={isThisLive} />
+        )}
+
+        {/* Message text */}
+        {msg.isStreaming && !msg.content ? (
+          <TypingDots />
+        ) : msg.content ? (
+          <div className={cn(
+            "prose prose-sm max-w-none prose-invert",
+            "text-[14px] leading-[1.78]",
+            "[&>p]:text-white/82 [&>p]:mb-3 [&>p:last-child]:mb-0",
+            "[&>ul]:text-white/78 [&>ul]:space-y-1 [&>ol]:text-white/78",
+            "[&>ul>li]:text-white/78 [&>ol>li]:text-white/78",
+            "[&>h1]:text-white/90 [&>h1]:font-bold [&>h1]:text-lg [&>h1]:mb-3 [&>h1]:mt-4",
+            "[&>h2]:text-white/88 [&>h2]:font-semibold [&>h2]:text-base [&>h2]:mb-2 [&>h2]:mt-4",
+            "[&>h3]:text-white/85 [&>h3]:font-semibold [&>h3]:text-sm [&>h3]:mb-2 [&>h3]:mt-3",
+            "[&>hr]:border-white/8 [&>hr]:my-5",
+          )}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ className, children }) {
+                  if (className?.includes("language-")) return <CodeBlock className={className}>{children}</CodeBlock>;
+                  return <code className="bg-white/10 px-1.5 py-0.5 rounded-md text-[12px] font-mono text-cyan-300 border border-white/8">{children}</code>;
+                },
+                img({ src, alt }) {
+                  if (!src) return null;
+                  return <InlineImage src={src} alt={alt} />;
+                },
+                table({ children }) {
+                  return (
+                    <div className="overflow-x-auto my-3 rounded-xl border border-white/8 not-prose">
+                      <table className="border-collapse w-full text-xs">{children}</table>
+                    </div>
+                  );
+                },
+                th({ children }) { return <th className="border-b border-white/10 px-4 py-2.5 bg-white/5 font-semibold text-white/80 text-right">{children}</th>; },
+                td({ children }) { return <td className="border-b border-white/5 px-4 py-2 text-white/60 last:border-0 text-right">{children}</td>; },
+                blockquote({ children }) {
+                  return <blockquote className="not-prose border-r-2 border-primary/40 pr-4 text-white/50 italic my-3 mr-0">{children}</blockquote>;
+                },
+                a({ href, children }) {
+                  return <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">{children}</a>;
+                },
+              }}
+            >{msg.content}</ReactMarkdown>
+            {msg.isStreaming && (
+              <motion.span
+                animate={{ opacity: [1, 0] }}
+                transition={{ duration: 0.55, repeat: 9999 }}
+                className="inline-block w-[2px] h-[1.1em] bg-primary/80 mx-0.5 align-middle rounded-full"
+              />
+            )}
+          </div>
+        ) : null}
+
+        {/* Error state */}
         {msg.error && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex items-start gap-2 mt-1 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs max-w-full">
+            className="flex items-start gap-2 mt-2 px-3 py-2.5 rounded-xl bg-red-500/8 border border-red-500/18 text-red-300 text-xs max-w-full">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             <span dir="auto">{msg.error}</span>
           </motion.div>
         )}
+
+        {/* Footer: time · copy · tokens */}
+        <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <span className="text-[10px] text-white/20 select-none">
+            {msg.createdAt.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          {msg.content && <CopyBtn text={msg.content} />}
+          {msg.tokensUsed && (
+            <span className="flex items-center gap-1 text-[10px] text-white/18">
+              <Hash className="w-2.5 h-2.5" />{msg.tokensUsed.toLocaleString()}
+            </span>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -1278,28 +1506,30 @@ function EmptyState({ onSelectSuggestion }: { onSelectSuggestion: (text: string)
           ابحث في الويب، اكتب الكود، حلّل البيانات، وأنجز مهامك المعقدة
         </motion.p>
 
-        {/* 2×2 suggestion grid */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 max-w-sm mx-auto">
-          {SUGGESTIONS.map((s, i) => (
-            <motion.button key={i}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 * i + 0.28 }}
-              whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}
-              onClick={() => onSelectSuggestion(PROMPTS[i])}
-              className={cn(
-                "flex flex-col items-start gap-2.5 px-3.5 py-3.5 rounded-2xl bg-gradient-to-br border text-right transition-all group",
-                s.color, s.border,
-                "hover:shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
-              )}>
-              <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.iconBg)}>
-                {s.icon}
-              </div>
-              <div className="text-right w-full">
-                <p className="text-xs font-bold text-white/80 leading-tight mb-0.5">{s.title}</p>
-                <p className="text-[11px] text-white/40 leading-snug">{s.sub}</p>
-              </div>
-            </motion.button>
-          ))}
+        {/* Scrollable suggestion cards */}
+        <div className="relative w-full max-w-lg mx-auto">
+          <div className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory hide-scrollbar px-1">
+            {SUGGESTIONS.map((s, i) => (
+              <motion.button key={i}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 * i + 0.28 }}
+                whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}
+                onClick={() => onSelectSuggestion(PROMPTS[i])}
+                className={cn(
+                  "flex-shrink-0 w-40 sm:w-44 flex flex-col items-start gap-2.5 px-3.5 py-3.5 rounded-2xl bg-gradient-to-br border text-right transition-all group snap-start",
+                  s.color, s.border,
+                  "hover:shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+                )}>
+                <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", s.iconBg)}>
+                  {s.icon}
+                </div>
+                <div className="text-right w-full">
+                  <p className="text-xs font-bold text-white/80 leading-tight mb-0.5">{s.title}</p>
+                  <p className="text-[11px] text-white/40 leading-snug">{s.sub}</p>
+                </div>
+              </motion.button>
+            ))}
+          </div>
         </div>
 
         {/* Capabilities pills */}
@@ -1340,9 +1570,7 @@ export default function ChatPage() {
   const [isRunning, setIsRunning]                 = useState(false);
   const [sidebarOpen, setSidebarOpen]             = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [traceOpen, setTraceOpen]                 = useState(false);
   const [settingsOpen, setSettingsOpen]           = useState(false);
-  const [activeTraceTaskId, setActiveTraceTaskId] = useState<string | null>(null);
   const [liveSteps, setLiveSteps]                 = useState<TraceStep[]>([]);
   const [activeSseTaskId, setActiveSseTaskId]     = useState<string | null>(null);
   const [useOrchestrate, setUseOrchestrate]       = useState(false);
@@ -1359,9 +1587,6 @@ export default function ChatPage() {
 
   const user     = (meData as any)?.user;
   const sessions = (sessionsData as any)?.sessions ?? [];
-
-  const traceSteps   = activeTraceTaskId === activeSseTaskId ? liveSteps : (messages.find(m => m.taskId === activeTraceTaskId)?.steps ?? []);
-  const isLiveRunning = activeTraceTaskId === activeSseTaskId && isRunning;
 
   // Scroll detection
   useEffect(() => {
@@ -1385,18 +1610,11 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
   }, [input]);
 
-  const handleShowTrace = useCallback((taskId: string) => {
-    setActiveTraceTaskId(taskId);
-    setTraceOpen(true);
-  }, []);
-
   const connectSSE = useCallback((taskId: string, assistantMsgId: string) => {
     sseRef.current?.close();
     setActiveSseTaskId(taskId);
-    setActiveTraceTaskId(taskId);
     setLiveSteps([]);
     liveStepsRef.current = [];
-    setTraceOpen(true);
 
     const sse = new EventSource(`/api/agent/tasks/${taskId}/stream`);
     sseRef.current = sse;
@@ -1518,8 +1736,8 @@ export default function ChatPage() {
   };
 
   const newChat = () => {
-    setMessages([]); setCurrentSessionId(null); setActiveTraceTaskId(null);
-    setLiveSteps([]); setTraceOpen(false); setMobileSidebarOpen(false);
+    setMessages([]); setCurrentSessionId(null);
+    setLiveSteps([]); setActiveSseTaskId(null); setMobileSidebarOpen(false);
     setLocation("/chat");
   };
 
@@ -1582,28 +1800,6 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Trace bottom sheet on mobile ─────────────────────── */}
-      <AnimatePresence>
-        {traceOpen && (
-          <>
-            <motion.div key="trace-overlay"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setTraceOpen(false)}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden" />
-            <motion.div key="trace-sheet"
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 32, stiffness: 340 }}
-              className="fixed bottom-0 left-0 right-0 h-[55vh] bg-[hsl(228_22%_6%)] border-t border-white/8 rounded-t-3xl z-50 md:hidden flex flex-col overflow-hidden"
-            >
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-1 shrink-0">
-                <div className="w-10 h-1 rounded-full bg-white/15" />
-              </div>
-              <ExecutionTrace steps={traceSteps} isRunning={isLiveRunning} onClose={() => setTraceOpen(false)} />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* ── Desktop Sidebar ───────────────────────────────────── */}
       <AnimatePresence initial={false}>
@@ -1656,16 +1852,6 @@ export default function ChatPage() {
               <Workflow className="w-3.5 h-3.5" />
               <span className="hidden lg:block">{useOrchestrate ? "تعدد وكلاء" : "وكيل واحد"}</span>
             </button>
-
-            {/* Trace toggle */}
-            <button onClick={() => setTraceOpen(p => !p)}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all",
-                traceOpen ? "bg-primary/12 border-primary/25 text-primary" : "bg-white/4 border-white/8 text-white/35 hover:text-white/65"
-              )}>
-              {traceOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
-              <span className="hidden sm:block">مسار التنفيذ</span>
-            </button>
           </div>
         </div>
 
@@ -1674,11 +1860,16 @@ export default function ChatPage() {
           {messages.length === 0 ? (
             <EmptyState onSelectSuggestion={(text) => { setInput(text); setTimeout(() => textareaRef.current?.focus(), 50); }} />
           ) : (
-            <div className="max-w-3xl mx-auto w-full py-4 sm:py-6 pb-2 space-y-1">
+            <div className="max-w-3xl mx-auto w-full py-4 sm:py-6 pb-2 space-y-0">
               {messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} onShowTrace={handleShowTrace} activeTraceId={activeTraceTaskId} />
+                <MessageRow
+                  key={msg.id}
+                  msg={msg}
+                  liveSteps={liveSteps}
+                  activeSseTaskId={activeSseTaskId}
+                />
               ))}
-              <div ref={bottomRef} className="h-4" />
+              <div ref={bottomRef} className="h-6" />
             </div>
           )}
         </div>
@@ -1802,18 +1993,6 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* ── Desktop Trace Panel ───────────────────────────────── */}
-      <AnimatePresence initial={false}>
-        {traceOpen && (
-          <motion.aside key="trace"
-            initial={{ width: 0, opacity: 0 }} animate={{ width: 320, opacity: 1 }} exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden md:flex flex-col border-r border-white/6 bg-[hsl(228_22%_4%)] overflow-hidden shrink-0"
-          >
-            <ExecutionTrace steps={traceSteps} isRunning={isLiveRunning} onClose={() => setTraceOpen(false)} />
-          </motion.aside>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
