@@ -25,6 +25,7 @@ const CreateSessionBody = z.object({
 const CreateTaskBody = z.object({
   sessionId: z.string(),
   goal: z.string().min(1).max(10000),
+  model: z.string().optional(),
 });
 
 router.post("/sessions", async (req: Request, res: Response) => {
@@ -381,7 +382,8 @@ router.post("/run/stream", async (req: Request, res: Response) => {
     return;
   }
 
-  const { sessionId, goal } = parsed.data;
+  const { sessionId, goal, model } = parsed.data;
+  const selectedModel = model ?? "gpt-5.2";
 
   const [session] = await db
     .select()
@@ -416,9 +418,9 @@ router.post("/run/stream", async (req: Request, res: Response) => {
       toolName: step.toolName,
       toolInput: step.toolInput,
       observation: step.observation,
-      status: "completed",
+      status: step.status,
     });
-  }).then((result) => {
+  }, selectedModel).then((result) => {
     broadcastTaskEvent(taskId, "done", {
       status: result.success ? "completed" : "failed",
       result: result.result,

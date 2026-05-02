@@ -25,6 +25,7 @@ import { SlackTool } from "./slack-tool.js";
 import { NotionTool } from "./notion-tool.js";
 import { sandboxedCodeExecutorTool } from "./sandboxed-executor.js";
 import { createSemanticMemoryTool, createSemanticStoreMemoryTool } from "./semantic-memory-tool.js";
+import { imageGeneratorTool } from "./image-generator.js";
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
@@ -114,6 +115,7 @@ export function createDefaultRegistry(sessionId?: string): ToolRegistry {
   registry.register(memoryStoreTool);
   registry.register(memorySearchTool);
   registry.register(spawnAgentsTool);
+  registry.register(imageGeneratorTool);
   registry.register(new IntegrationManagerTool());
   registry.register(new GitHubTool());
   registry.register(new GoogleDriveTool());

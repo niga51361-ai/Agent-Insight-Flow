@@ -7,48 +7,67 @@ import {
 import { eq } from "drizzle-orm";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { MemoryManager } from "../memory/manager.js";
-import { runCritic } from "../critic/critic.js";
 import { logger } from "../../lib/logger.js";
 
 let _openaiInstance: OpenAI | null = null;
-  function getOpenAI(): OpenAI {
-    if (!_openaiInstance) {
-      _openaiInstance = new OpenAI({
-        apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
-        baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
-      });
-    }
-    return _openaiInstance;
+function getOpenAI(): OpenAI {
+  if (!_openaiInstance) {
+    _openaiInstance = new OpenAI({
+      apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
+      baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
+    });
   }
+  return _openaiInstance;
+}
 
-const SYSTEM_PROMPT = `You are Zanix, an elite autonomous AI agent. You answer questions directly and completely, and use tools only when truly necessary.
+// ─── System prompt ─────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are Zanix, an elite autonomous AI agent built by Zanix AI. You are fast, direct, and highly capable.
 
-## CRITICAL RULE — Answer First:
-- **For any question or request that you can answer from your knowledge, answer it immediately and fully.** Do NOT use tools just to seem busy.
-- Simple questions (definitions, explanations, opinions, general knowledge, math, coding help, writing, advice) → answer DIRECTLY without any tool calls.
-- Only call tools when you genuinely need live data, external resources, or execution that you cannot provide from knowledge alone.
+## CRITICAL — Speed First:
+- Answer DIRECTLY and IMMEDIATELY from your knowledge for any question you can.
+- DO NOT use tools unless you genuinely need live/external data.
+- Simple questions → answer in ONE response with no tool calls.
 
 ## When to use tools:
-- Web search / browse: only for live news, current prices, real-time data, or URLs the user explicitly wants
-- Code execution: only when the user explicitly wants code to be run
-- File save: only when the user asks to save or export something
-- Calculator: only for complex multi-step calculations
-- Image analysis: only when an image is provided
+- Web search: live news, current prices, real-time events
+- Code execution: user explicitly wants code RUN (not just written)
+- generate_image: user asks for an image, illustration, diagram, or visual
+- File save: user asks to save/export
+- Calculator: complex multi-step math only
 
-## When NOT to use tools (answer directly instead):
-- Explaining concepts, answering factual questions, writing text, translating, giving advice
-- Writing code (just write it in your response)
-- Solving math you can do mentally
-- Anything achievable purely from your training knowledge
+## When NOT to use tools:
+- Writing code (just write it in the response as markdown code blocks)
+- Explaining concepts, answering factual questions, translations
+- Math you can do mentally
+
+## Image generation:
+- When explaining a concept that benefits from visuals, call generate_image to illustrate it.
+- When user asks "show me", "draw", "generate image of", always use generate_image tool.
+- When writing code for a game/website, also generate a preview screenshot concept.
+
+## Code output:
+- Always wrap code in proper markdown fenced code blocks with language identifier.
+- For complete HTML/CSS/JS apps or games, write the FULL complete code in one code block.
+- Mark complete standalone HTML files with a comment: <!-- zanix-preview -->
 
 ## Response quality:
-1. **Match user language** — Arabic input → Arabic reply, English input → English reply
-2. **Be direct and complete** — give the full answer, not a plan to find the answer
-3. **Format beautifully** — use markdown headers, bullet points, code blocks as appropriate
-4. **Be concise when possible** — don't pad answers unnecessarily
-5. **For complex tasks** — reason step by step, use tools only for steps requiring external data
+1. Match user language — Arabic input → Arabic reply
+2. Be direct and complete — full answer, not a plan
+3. Format beautifully — markdown headers, bullets, code blocks
+4. For Arabic replies, be natural and conversational
 
 You are knowledgeable, direct, and highly capable. Answer every question fully and immediately.`;
+
+// ─── Step event type ──────────────────────────────────────────────────
+export interface StepEvent {
+  stepIndex: number;
+  stepType: string;
+  thought: string | null;
+  toolName: string | null;
+  toolInput: Record<string, unknown>;
+  observation: string;
+  status: "running" | "completed" | "failed";
+}
 
 export interface RunResult {
   success: boolean;
@@ -73,8 +92,8 @@ export async function runAgent(
   goal: string,
   registry: ToolRegistry,
   memory: MemoryManager,
-  onStep?: (step: string) => void,
-  useCritic: boolean = true
+  onStep?: (step: StepEvent) => void,
+  model: string = "gpt-5.2"
 ): Promise<RunResult> {
   const steps: RunResult["steps"] = [];
   const artifacts: RunResult["artifacts"] = [];
@@ -93,7 +112,7 @@ export async function runAgent(
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `Task ID: ${taskId}\nSession ID: ${sessionId}\n\nGoal: ${goal}${memoryContext}`,
+      content: `Goal: ${goal}${memoryContext}`,
     },
   ];
 
@@ -102,7 +121,7 @@ export async function runAgent(
     .set({ status: "running", updatedAt: new Date() })
     .where(eq(agentTasksTable.taskId, taskId));
 
-  const MAX_ITERATIONS = 20;
+  const MAX_ITERATIONS = 12;
   let iteration = 0;
 
   while (iteration < MAX_ITERATIONS) {
@@ -111,11 +130,11 @@ export async function runAgent(
     let response: OpenAI.ChatCompletion;
     try {
       response = await getOpenAI().chat.completions.create({
-        model: "gpt-5.2",
+        model,
         messages,
         tools: registry.toOpenAIFormat(),
         tool_choice: "auto",
-        max_completion_tokens: 4096,
+        max_completion_tokens: 8192,
       });
     } catch (err) {
       logger.error({ err, taskId }, "OpenAI call failed");
@@ -131,20 +150,7 @@ export async function runAgent(
     messages.push(assistantMessage);
 
     if (choice.finish_reason === "stop" || !assistantMessage.tool_calls?.length) {
-      let finalText = assistantMessage.content ?? "Task completed.";
-
-      if (useCritic && finalText.length > 80) {
-        try {
-          onStep?.("🔍 Self-critique review...");
-          const critiqueResult = await runCritic(goal, finalText, 2);
-          if (!critiqueResult.approved || critiqueResult.score < 85) {
-            finalText = critiqueResult.improvedAnswer;
-            logger.info({ taskId, score: critiqueResult.score, rounds: critiqueResult.critiqueRounds }, "Critic improved answer");
-          }
-        } catch (err) {
-          logger.warn({ err }, "Critic failed, using original answer");
-        }
-      }
+      const finalText = assistantMessage.content ?? "Task completed.";
 
       await db
         .update(agentTasksTable)
@@ -188,7 +194,16 @@ export async function runAgent(
         continue;
       }
 
-      onStep?.(`⚙️ ${toolName}...`);
+      // Emit "running" step immediately
+      onStep?.({
+        stepIndex,
+        stepType: toolName,
+        thought: assistantMessage.content ?? null,
+        toolName,
+        toolInput,
+        observation: "",
+        status: "running",
+      });
 
       let toolResult: { success: boolean; output: unknown; error?: string };
       try {
@@ -213,9 +228,10 @@ export async function runAgent(
       };
       steps.push(stepData);
 
+      // Persist step to DB
       await db.insert(agentStepsTable).values({
         taskId,
-        stepIndex: stepIndex++,
+        stepIndex: stepIndex,
         stepType: "shell" as const,
         thought: stepData.thought,
         toolName,
@@ -224,14 +240,26 @@ export async function runAgent(
         observation,
       });
 
-      if (toolResult.success && toolInput.content) {
-        if (toolName === "save_file") {
-          artifacts.push({
-            name: String(toolInput.name ?? "file"),
-            type: String(toolInput.artifactType ?? "text"),
-            content: String(toolInput.content),
-          });
-        }
+      // Emit "completed" step event
+      onStep?.({
+        stepIndex,
+        stepType: toolName,
+        thought: stepData.thought,
+        toolName,
+        toolInput,
+        observation,
+        status: toolResult.success ? "completed" : "failed",
+      });
+
+      stepIndex++;
+
+      // Handle artifacts
+      if (toolResult.success && toolName === "save_file" && toolInput.content) {
+        artifacts.push({
+          name: String(toolInput.name ?? "file"),
+          type: String(toolInput.artifactType ?? "text"),
+          content: String(toolInput.content),
+        });
       }
 
       if (toolResult.success && toolName === "build_website" && toolResult.output) {
@@ -243,38 +271,13 @@ export async function runAgent(
         }
       }
 
-      if (toolResult.success && toolName === "write_document" && toolResult.output) {
-        const out = toolResult.output as { markdownContent?: string; title?: string };
-        if (out.markdownContent) {
+      if (toolResult.success && toolName === "generate_image" && toolResult.output) {
+        const out = toolResult.output as { imageUrl?: string; b64?: string; prompt?: string };
+        if (out.imageUrl || out.b64) {
           artifacts.push({
-            name: String(out.title ?? "document") + ".md",
-            type: "markdown",
-            content: out.markdownContent,
-          });
-        }
-      }
-
-      if (toolResult.success && toolName === "generate_diagram" && toolResult.output) {
-        const out = toolResult.output as { renderHtml?: string; diagramType?: string };
-        if (out.renderHtml) {
-          artifacts.push({
-            name: `diagram-${out.diagramType ?? "chart"}.html`,
-            type: "html",
-            content: out.renderHtml,
-          });
-        }
-      }
-
-      if (toolResult.success && toolName === "debug_code" && toolResult.output) {
-        const out = toolResult.output as { fixedCode?: string; language?: string };
-        if (out.fixedCode) {
-          const ext: Record<string, string> = {
-            typescript: "ts", javascript: "js", python: "py", rust: "rs", go: "go",
-          };
-          artifacts.push({
-            name: `fixed-code.${ext[String(out.language ?? "").toLowerCase()] ?? "txt"}`,
-            type: "code",
-            content: out.fixedCode,
+            name: `image-${stepIndex}.png`,
+            type: "image",
+            content: out.imageUrl ?? `data:image/png;base64,${out.b64}`,
           });
         }
       }

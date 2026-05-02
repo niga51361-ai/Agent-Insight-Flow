@@ -63,7 +63,7 @@ export async function runCritic(
     let response: OpenAI.ChatCompletion;
     try {
       response = await getOpenAI().chat.completions.create({
-        model: "gpt-5-mini",
+        model: "gpt-5-nano",
         messages: [
           { role: "system", content: CRITIC_SYSTEM_PROMPT },
           {

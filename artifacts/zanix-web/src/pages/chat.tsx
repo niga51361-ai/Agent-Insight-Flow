@@ -13,6 +13,7 @@ import {
   Square, Sparkles,
   Paperclip, Mic, X,
   Hash, Workflow, ChevronUp,
+  Maximize2, Play, Image as ImageIcon,
 } from "lucide-react";
 import {
   useGetMe, useLogout, useCreateSession, useListSessions,
@@ -48,9 +49,9 @@ interface Message {
 }
 
 const MODELS = [
-  { id: "gpt-4o",      label: "GPT-4o",      badge: "سريع",      dot: "bg-emerald-400",  color: "text-emerald-400" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini", badge: "اقتصادي",   dot: "bg-amber-400",    color: "text-amber-400" },
-  { id: "o3",          label: "o3",          badge: "استنتاج",   dot: "bg-violet-400",   color: "text-violet-400" },
+  { id: "gpt-5.2",    label: "Zanix Max",   badge: "الأقوى",    dot: "bg-violet-400",   color: "text-violet-400" },
+  { id: "gpt-5-nano", label: "Zanix Flash", badge: "الأسرع",    dot: "bg-cyan-400",     color: "text-cyan-400" },
+  { id: "o4-mini",    label: "Zanix Think", badge: "استنتاج",   dot: "bg-amber-400",    color: "text-amber-400" },
 ];
 
 // ─── Step icons / colors ─────────────────────────────────────────
@@ -230,27 +231,80 @@ function ExecutionTrace({ steps, isRunning, onClose }: { steps: TraceStep[]; isR
   );
 }
 
+// ─── HTML Preview Modal ───────────────────────────────────────────
+function HtmlPreviewModal({ html, onClose }: { html: string; onClose: () => void }) {
+  const blob = new Blob([html], { type: "text/html" });
+  const url  = URL.createObjectURL(blob);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col"
+        onClick={onClose}
+      >
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[hsl(228_22%_6%)] border-b border-white/8 shrink-0" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+              <Play className="w-3 h-3 text-primary" />
+            </div>
+            <span className="text-xs font-semibold text-white/70">معاينة مباشرة</span>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors p-1.5 rounded-lg hover:bg-white/6">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 p-3 sm:p-4" onClick={e => e.stopPropagation()}>
+          <iframe
+            src={url}
+            className="w-full h-full rounded-2xl border border-white/10 bg-white"
+            sandbox="allow-scripts allow-same-origin"
+            title="Code Preview"
+          />
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ─── Code block ───────────────────────────────────────────────────
 function CodeBlock({ className, children }: { className?: string; children: React.ReactNode }) {
+  const [showPreview, setShowPreview] = useState(false);
   const lang = className?.replace("language-", "") ?? "";
   const code = String(children).replace(/\n$/, "");
+  const isHtml = lang === "html" || code.includes("<!DOCTYPE") || code.includes("<html") || code.includes("<!-- zanix-preview -->");
   return (
-    <div className="relative group/code my-3 rounded-xl overflow-hidden border border-white/8">
-      <div className="flex items-center justify-between px-4 py-2 bg-white/[0.04] border-b border-white/6">
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+    <>
+      <div className="relative group/code my-3 rounded-xl overflow-hidden border border-white/8">
+        <div className="flex items-center justify-between px-4 py-2 bg-white/[0.04] border-b border-white/6">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+            </div>
+            {lang && <span className="text-[10px] font-mono text-white/30 uppercase">{lang}</span>}
           </div>
-          {lang && <span className="text-[10px] font-mono text-white/30 uppercase">{lang}</span>}
+          <div className="flex items-center gap-1.5">
+            {isHtml && (
+              <motion.button
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => setShowPreview(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/25 text-primary hover:bg-primary/25 transition-all text-[10px] font-bold"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                <span>معاينة</span>
+              </motion.button>
+            )}
+            <CopyBtn text={code} />
+          </div>
         </div>
-        <CopyBtn text={code} />
+        <pre className="bg-[hsl(228_25%_3%)] p-4 overflow-x-auto text-[12.5px] leading-relaxed">
+          <code className={cn("font-mono", className)}>{children}</code>
+        </pre>
       </div>
-      <pre className="bg-[hsl(228_25%_3%)] p-4 overflow-x-auto text-[12.5px] leading-relaxed">
-        <code className={cn("font-mono", className)}>{children}</code>
-      </pre>
-    </div>
+      {showPreview && <HtmlPreviewModal html={code} onClose={() => setShowPreview(false)} />}
+    </>
   );
 }
 
@@ -297,6 +351,10 @@ function MessageBubble({ msg, onShowTrace, activeTraceId }: {
                   code({ className, children }) {
                     if (className?.includes("language-")) return <CodeBlock className={className}>{children}</CodeBlock>;
                     return <code className="bg-white/12 px-1.5 py-0.5 rounded-md text-[12px] font-mono text-cyan-300">{children}</code>;
+                  },
+                  img({ src, alt }) {
+                    if (!src) return null;
+                    return <InlineImage src={src} alt={alt} />;
                   },
                   table({ children }) {
                     return <div className="overflow-x-auto my-3 rounded-xl border border-white/8"><table className="border-collapse w-full text-xs">{children}</table></div>;
@@ -352,6 +410,46 @@ function MessageBubble({ msg, onShowTrace, activeTraceId }: {
         )}
       </div>
     </motion.div>
+  );
+}
+
+// ─── Inline image from agent ──────────────────────────────────────
+function InlineImage({ src, alt }: { src: string; alt?: string }) {
+  const [enlarged, setEnlarged] = useState(false);
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="my-3 rounded-2xl overflow-hidden border border-white/10 cursor-zoom-in max-w-full sm:max-w-md shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+        onClick={() => setEnlarged(true)}
+      >
+        <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border-b border-white/6">
+          <ImageIcon className="w-3 h-3 text-primary" />
+          <span className="text-[10px] text-white/40 font-medium">{alt || "صورة مُولَّدة بالذكاء الاصطناعي"}</span>
+          <Maximize2 className="w-3 h-3 text-white/20 mr-auto" />
+        </div>
+        <img src={src} alt={alt || "AI generated"} className="w-full h-auto object-contain bg-white/5" />
+      </motion.div>
+      <AnimatePresence>
+        {enlarged && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            onClick={() => setEnlarged(false)}>
+            <motion.img
+              initial={{ scale: 0.85 }} animate={{ scale: 1 }} exit={{ scale: 0.85 }}
+              src={src} alt={alt || "AI generated"}
+              className="max-w-full max-h-full rounded-2xl shadow-2xl object-contain"
+              onClick={e => e.stopPropagation()}
+            />
+            <button onClick={() => setEnlarged(false)}
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -634,7 +732,7 @@ export default function ChatPage() {
   const [liveSteps, setLiveSteps]                 = useState<TraceStep[]>([]);
   const [activeSseTaskId, setActiveSseTaskId]     = useState<string | null>(null);
   const [useOrchestrate, setUseOrchestrate]       = useState(false);
-  const [selectedModel, setSelectedModel]         = useState("gpt-4o");
+  const [selectedModel, setSelectedModel]         = useState("gpt-5.2");
   const [showScrollBtn, setShowScrollBtn]         = useState(false);
 
   const bottomRef     = useRef<HTMLDivElement>(null);
@@ -748,6 +846,7 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: sid, goal: text, model: selectedModel }),
           credentials: "include",
+          cache: "no-store",
         });
         if (!startRes.ok) throw new Error(`فشل الاتصال بالخادم (${startRes.status})`);
         const { taskId } = await startRes.json();
