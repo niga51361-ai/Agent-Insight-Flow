@@ -15,6 +15,9 @@ import {
   Hash, Workflow, ChevronUp,
   Maximize2, Play, Image as ImageIcon,
   File as FileIcon, UploadCloud,
+  Settings, User, Key, Puzzle, Cpu,
+  ChevronLeft, ExternalLink, Shield, Bell,
+  Palette, Sliders, Database, Bot,
 } from "lucide-react";
 import {
   useGetMe, useLogout, useCreateSession, useListSessions,
@@ -537,10 +540,362 @@ function SessionItem({ session, isActive, onClick }: { session: any; isActive: b
   );
 }
 
-function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectSession, onLogout, onIntegrations }: {
+// ─── Settings Panel ───────────────────────────────────────────────
+const SETTINGS_TABS = [
+  { id: "profile",      label: "الملف الشخصي",  icon: User },
+  { id: "models",       label: "النماذج",        icon: Cpu },
+  { id: "api",          label: "مفاتيح API",     icon: Key },
+  { id: "integrations", label: "التكاملات",      icon: Puzzle },
+  { id: "tools",        label: "الأدوات",        icon: Sliders },
+  { id: "appearance",   label: "المظهر",         icon: Palette },
+  { id: "notifications",label: "الإشعارات",     icon: Bell },
+  { id: "security",     label: "الأمان",         icon: Shield },
+] as const;
+
+type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
+
+function SettingsPanel({ user, onClose, onLogout }: { user: any; onClose: () => void; onLogout: () => void }) {
+  const [tab, setTab] = useState<SettingsTab>("profile");
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  const INTEGRATIONS_LIST = [
+    { name: "OpenAI",     icon: "🤖", desc: "نماذج GPT وDALL-E",            status: "متصل",    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+    { name: "Serper",     icon: "🔍", desc: "بحث ويب في الوقت الفعلي",     status: "متصل",    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+    { name: "GitHub",     icon: "🐙", desc: "إدارة المستودعات والكود",      status: "غير متصل", color: "text-white/30 bg-white/4 border-white/8" },
+    { name: "Notion",     icon: "📝", desc: "قواعد المعرفة والملاحظات",    status: "غير متصل", color: "text-white/30 bg-white/4 border-white/8" },
+    { name: "Slack",      icon: "💬", desc: "إرسال رسائل وإشعارات",        status: "غير متصل", color: "text-white/30 bg-white/4 border-white/8" },
+    { name: "Google",     icon: "📊", desc: "Sheets, Drive, Docs",           status: "غير متصل", color: "text-white/30 bg-white/4 border-white/8" },
+    { name: "PostgreSQL", icon: "🗄️", desc: "قاعدة بيانات متصلة",          status: "متصل",    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+    { name: "Stripe",     icon: "💳", desc: "معالجة المدفوعات",            status: "غير متصل", color: "text-white/30 bg-white/4 border-white/8" },
+  ];
+
+  const TOOLS_LIST = [
+    { name: "webSearch",      label: "بحث الويب",          icon: "🌐", active: true,  desc: "يبحث في الإنترنت عبر Serper API" },
+    { name: "webBrowse",      label: "تصفح الصفحات",       icon: "🔗", active: true,  desc: "يفتح ويقرأ محتوى المواقع" },
+    { name: "codeRunner",     label: "تشغيل الكود",         icon: "⚡", active: true,  desc: "ينفّذ Python وJS في sandbox آمن" },
+    { name: "imageGenerator", label: "توليد الصور",         icon: "🎨", active: true,  desc: "ينشئ صوراً عبر DALL-E 3" },
+    { name: "fileWriter",     label: "كتابة الملفات",      icon: "📄", active: true,  desc: "ينشئ ويعدّل الملفات" },
+    { name: "dataAnalyzer",   label: "تحليل البيانات",     icon: "📊", active: true,  desc: "يحلّل CSV وJSON والبيانات الهيكلية" },
+    { name: "calculator",     label: "الحاسبة",             icon: "🔢", active: true,  desc: "عمليات رياضية وإحصاء متقدم" },
+    { name: "memory",         label: "الذاكرة طويلة الأمد", icon: "🧠", active: false, desc: "يتذكر السياق عبر المحادثات" },
+  ];
+
+  const [toolStates, setToolStates] = useState<Record<string, boolean>>(
+    Object.fromEntries(TOOLS_LIST.map(t => [t.name, t.active]))
+  );
+
+  return (
+    <div className="flex flex-col h-full" dir="rtl">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/6 shrink-0">
+        <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
+          <Settings className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-white">الإعدادات</p>
+          <p className="text-[10px] text-white/30">إدارة حسابك والنظام</p>
+        </div>
+        <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/6 transition-all">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left nav */}
+        <div className="w-44 shrink-0 border-l border-white/5 p-2 space-y-0.5 overflow-y-auto">
+          {SETTINGS_TABS.map(t => {
+            const Icon = t.icon;
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all text-right",
+                  tab === t.id
+                    ? "bg-primary/12 border border-primary/20 text-primary"
+                    : "text-white/35 hover:text-white/65 hover:bg-white/4"
+                )}>
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+          {/* ── Profile ── */}
+          {tab === "profile" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">الملف الشخصي</h3>
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/3 border border-white/6">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 flex items-center justify-center text-xl font-bold text-white shrink-0">
+                  {(user?.name ?? user?.email ?? "U")[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{user?.name ?? "—"}</p>
+                  <p className="text-xs text-white/40 truncate">{user?.email ?? "—"}</p>
+                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary/80 border border-primary/20">
+                    <Sparkles className="w-2.5 h-2.5" /> خطة مجانية
+                  </span>
+                </div>
+              </div>
+              {[
+                { label: "الاسم الكامل",    value: user?.name  ?? "", placeholder: "أدخل اسمك" },
+                { label: "البريد الإلكتروني", value: user?.email ?? "", placeholder: "email@example.com" },
+              ].map((field, i) => (
+                <div key={i} className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">{field.label}</label>
+                  <input defaultValue={field.value} placeholder={field.placeholder}
+                    className="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-primary/40 focus:bg-white/[0.06] transition-all" />
+                </div>
+              ))}
+              <button onClick={handleSave}
+                className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                  saved ? "bg-emerald-500/15 border border-emerald-500/25 text-emerald-400" : "bg-primary/15 border border-primary/25 text-primary hover:bg-primary/22")}>
+                {saved ? <><Check className="w-3.5 h-3.5" /> تم الحفظ</> : "حفظ التغييرات"}
+              </button>
+              <div className="pt-2 border-t border-white/6">
+                <button onClick={onLogout}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition-all border border-transparent hover:border-red-500/15">
+                  <LogOut className="w-3.5 h-3.5" /> تسجيل الخروج
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Models ── */}
+          {tab === "models" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">نماذج الذكاء الاصطناعي</h3>
+              <p className="text-xs text-white/35 leading-relaxed">اختر النموذج المناسب لمهامك. كل نموذج له مزايا مختلفة.</p>
+              {MODELS.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-4 rounded-2xl bg-white/3 border border-white/6 hover:border-white/10 transition-all">
+                  <span className={cn("w-3 h-3 rounded-full shrink-0", m.dot)} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-bold text-white">{m.label}</p>
+                      <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/6 border border-white/8", m.color)}>{m.badge}</span>
+                    </div>
+                    <p className="text-[10px] text-white/35 font-mono">{m.id}</p>
+                  </div>
+                  <div className="text-[10px] text-white/25 font-medium">
+                    {m.id === "gpt-5.2" ? "128K توكن" : m.id === "gpt-5-nano" ? "32K توكن" : "64K توكن"}
+                  </div>
+                </div>
+              ))}
+              <div className="p-4 rounded-2xl bg-amber-500/6 border border-amber-500/15">
+                <p className="text-xs font-semibold text-amber-400/80 mb-1">ملاحظة</p>
+                <p className="text-[11px] text-white/40 leading-relaxed">جميع النماذج تعمل عبر OpenAI API. تحتاج إلى مفتاح API صالح في تبويب "مفاتيح API".</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── API Keys ── */}
+          {tab === "api" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">مفاتيح API</h3>
+              <p className="text-xs text-white/35 leading-relaxed">تُحفظ المفاتيح بشكل مشفر وآمن في البيئة. لا تُشارك مفاتيحك مع أحد.</p>
+              {[
+                { label: "OpenAI API Key",  placeholder: "sk-...",          env: "OPENAI_API_KEY",  status: true,  desc: "لتشغيل النماذج وتوليد الصور" },
+                { label: "Serper API Key",  placeholder: "xxxxxxxx...",     env: "SERPER_API_KEY",  status: true,  desc: "لبحث الويب في الوقت الفعلي" },
+                { label: "Anthropic Key",   placeholder: "sk-ant-...",      env: "ANTHROPIC_KEY",   status: false, desc: "لنماذج Claude (قريباً)" },
+                { label: "Replicate Key",   placeholder: "r8_...",          env: "REPLICATE_KEY",   status: false, desc: "لنماذج توليد الصور المتقدمة" },
+              ].map((key, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">{key.label}</label>
+                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
+                      key.status ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-white/25 bg-white/4 border-white/8")}>
+                      {key.status ? "● مُعيَّن" : "○ غير مُعيَّن"}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={apiKeyVisible ? "text" : "password"}
+                      placeholder={key.placeholder}
+                      defaultValue={key.status ? "••••••••••••••••••••" : ""}
+                      disabled={!key.status && i > 1}
+                      className="w-full bg-white/[0.04] border border-white/8 rounded-xl px-3.5 py-2.5 text-sm text-white/60 placeholder:text-white/20 focus:outline-none focus:border-primary/40 transition-all font-mono text-xs disabled:opacity-30" />
+                  </div>
+                  <p className="text-[10px] text-white/25">{key.desc}</p>
+                </div>
+              ))}
+              <button onClick={() => setApiKeyVisible(p => !p)}
+                className="flex items-center gap-2 text-[11px] text-white/30 hover:text-white/55 transition-colors">
+                <Eye className="w-3.5 h-3.5" />
+                {apiKeyVisible ? "إخفاء المفاتيح" : "إظهار المفاتيح"}
+              </button>
+            </div>
+          )}
+
+          {/* ── Integrations ── */}
+          {tab === "integrations" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">التكاملات</h3>
+              <p className="text-xs text-white/35 leading-relaxed">وصّل Zanix مع خدماتك المفضلة لتوسيع قدراته.</p>
+              <div className="space-y-2">
+                {INTEGRATIONS_LIST.map((intg, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/3 border border-white/6 hover:border-white/10 transition-all group">
+                    <span className="text-xl shrink-0">{intg.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white/80">{intg.name}</p>
+                      <p className="text-[10px] text-white/30">{intg.desc}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border", intg.color)}>
+                        {intg.status}
+                      </span>
+                      {intg.status === "غير متصل" && (
+                        <button className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] text-primary/70 hover:text-primary px-2 py-1 rounded-lg bg-primary/8 border border-primary/15">
+                          <ExternalLink className="w-3 h-3" /> ربط
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Tools ── */}
+          {tab === "tools" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">إدارة الأدوات</h3>
+              <p className="text-xs text-white/35 leading-relaxed">فعّل أو عطّل الأدوات التي يستخدمها الوكيل أثناء تنفيذ المهام.</p>
+              <div className="space-y-2">
+                {TOOLS_LIST.map((tool) => (
+                  <div key={tool.name} className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/3 border border-white/6 hover:border-white/10 transition-all">
+                    <span className="text-lg shrink-0">{tool.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white/75">{tool.label}</p>
+                      <p className="text-[10px] text-white/30">{tool.desc}</p>
+                    </div>
+                    <button
+                      onClick={() => setToolStates(p => ({ ...p, [tool.name]: !p[tool.name] }))}
+                      className={cn(
+                        "w-10 h-5.5 rounded-full border transition-all relative shrink-0",
+                        toolStates[tool.name]
+                          ? "bg-primary/30 border-primary/40"
+                          : "bg-white/6 border-white/10"
+                      )}>
+                      <motion.div
+                        animate={{ x: toolStates[tool.name] ? 18 : 2 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className={cn("absolute top-0.5 w-4 h-4 rounded-full",
+                          toolStates[tool.name] ? "bg-primary" : "bg-white/25"
+                        )} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Appearance ── */}
+          {tab === "appearance" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">المظهر</h3>
+              {[
+                { label: "نظام الألوان", options: ["داكن (افتراضي)", "فاتح", "تلقائي"] },
+                { label: "حجم الخط",    options: ["صغير", "متوسط (افتراضي)", "كبير"] },
+                { label: "كثافة الخلفية 3D", options: ["منخفضة", "متوسطة (افتراضي)", "عالية"] },
+              ].map((pref, i) => (
+                <div key={i} className="space-y-2">
+                  <label className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">{pref.label}</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {pref.options.map((opt, j) => (
+                      <button key={j}
+                        className={cn("px-3 py-1.5 rounded-xl text-xs border transition-all",
+                          j === 1 ? "bg-primary/12 border-primary/25 text-primary" : "bg-white/4 border-white/8 text-white/40 hover:border-white/16 hover:text-white/60")}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Notifications ── */}
+          {tab === "notifications" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">الإشعارات</h3>
+              {[
+                { label: "إشعار عند اكتمال المهمة",    active: true },
+                { label: "إشعارات الأخطاء والتنبيهات", active: true },
+                { label: "نصائح وتحديثات المنتج",      active: false },
+                { label: "إشعارات البريد الإلكتروني",  active: false },
+              ].map((notif, i) => {
+                const [on, setOn] = useState(notif.active);
+                return (
+                  <div key={i} className="flex items-center justify-between py-2.5 border-b border-white/5">
+                    <p className="text-xs text-white/60">{notif.label}</p>
+                    <button onClick={() => setOn(p => !p)}
+                      className={cn("w-10 h-5.5 rounded-full border transition-all relative",
+                        on ? "bg-primary/30 border-primary/40" : "bg-white/6 border-white/10")}>
+                      <motion.div animate={{ x: on ? 18 : 2 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className={cn("absolute top-0.5 w-4 h-4 rounded-full", on ? "bg-primary" : "bg-white/25")} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Security ── */}
+          {tab === "security" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-white/80">الأمان</h3>
+              <div className="p-4 rounded-2xl bg-emerald-500/6 border border-emerald-500/15 flex items-start gap-3">
+                <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-emerald-400/90 mb-1">الحساب محمي</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">جلسة نشطة واحدة · آخر دخول: الآن</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "تغيير كلمة المرور",     icon: Key,      desc: "ننصح بتغييرها كل 90 يوماً" },
+                  { label: "سجل النشاط",             icon: Activity, desc: "آخر 30 يوم من نشاط الحساب" },
+                  { label: "حذف جميع المحادثات",    icon: Database, desc: "لا يمكن التراجع عن هذا الإجراء" },
+                ].map((action, i) => {
+                  const Icon = action.icon;
+                  return (
+                    <button key={i} className={cn(
+                      "w-full flex items-center gap-3 p-3.5 rounded-2xl border text-right transition-all",
+                      i === 2
+                        ? "bg-red-500/5 border-red-500/12 hover:bg-red-500/10 hover:border-red-500/20"
+                        : "bg-white/3 border-white/6 hover:border-white/12"
+                    )}>
+                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center",
+                        i === 2 ? "bg-red-500/10" : "bg-white/5")}>
+                        <Icon className={cn("w-4 h-4", i === 2 ? "text-red-400" : "text-white/40")} />
+                      </div>
+                      <div className="flex-1 text-right">
+                        <p className={cn("text-xs font-semibold", i === 2 ? "text-red-400/80" : "text-white/65")}>{action.label}</p>
+                        <p className="text-[10px] text-white/30">{action.desc}</p>
+                      </div>
+                      <ChevronLeft className="w-3.5 h-3.5 text-white/20" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectSession, onLogout, onIntegrations, onSettings }: {
   user: any; sessions: any[]; currentSessionId: string | null;
   onNewChat: () => void; onSelectSession: (id: string) => void;
-  onLogout: () => void; onIntegrations: () => void;
+  onLogout: () => void; onIntegrations: () => void; onSettings: () => void;
 }) {
   return (
     <>
@@ -588,6 +943,11 @@ function SidebarContent({ user, sessions, currentSessionId, onNewChat, onSelectS
 
       {/* Footer */}
       <div className="p-3 border-t border-white/6 space-y-1 shrink-0">
+        <button onClick={onSettings}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-white/30 hover:text-white/60 hover:bg-white/4 transition-all text-xs">
+          <Settings className="w-3.5 h-3.5" />
+          <span>الإعدادات</span>
+        </button>
         <button onClick={onIntegrations}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-white/30 hover:text-white/60 hover:bg-white/4 transition-all text-xs">
           <Layers className="w-3.5 h-3.5" />
@@ -797,6 +1157,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen]             = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [traceOpen, setTraceOpen]                 = useState(false);
+  const [settingsOpen, setSettingsOpen]           = useState(false);
   const [activeTraceTaskId, setActiveTraceTaskId] = useState<string | null>(null);
   const [liveSteps, setLiveSteps]                 = useState<TraceStep[]>([]);
   const [activeSseTaskId, setActiveSseTaskId]     = useState<string | null>(null);
@@ -983,7 +1344,32 @@ export default function ChatPage() {
     : "محادثة جديدة";
 
   return (
-    <div className="flex h-dvh bg-transparent text-white overflow-hidden" dir="rtl">
+    <div className="flex h-dvh bg-[hsl(228_22%_4%)] text-white overflow-hidden" dir="rtl">
+
+      {/* ── Settings Modal (full-screen overlay) ──────────────── */}
+      <AnimatePresence>
+        {settingsOpen && (
+          <>
+            <motion.div key="settings-overlay"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setSettingsOpen(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60]" />
+            <motion.div key="settings-panel"
+              initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 12 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="fixed inset-4 sm:inset-8 md:inset-12 lg:inset-16 xl:inset-24 bg-[hsl(228_22%_5%)] border border-white/8 rounded-3xl z-[70] flex flex-col overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <SettingsPanel
+                user={user}
+                onClose={() => setSettingsOpen(false)}
+                onLogout={() => { logoutMutation.mutateAsync().then(() => setLocation("/")); setSettingsOpen(false); }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Mobile Sidebar Overlay (slides from right for RTL) ─── */}
       <AnimatePresence>
@@ -1004,6 +1390,7 @@ export default function ChatPage() {
                 onSelectSession={(sid) => { setCurrentSessionId(sid); setLocation(`/chat/${sid}`); setMobileSidebarOpen(false); }}
                 onLogout={() => logoutMutation.mutateAsync().then(() => setLocation("/"))}
                 onIntegrations={() => { setLocation("/integrations"); setMobileSidebarOpen(false); }}
+                onSettings={() => { setSettingsOpen(true); setMobileSidebarOpen(false); }}
               />
             </motion.aside>
           </>
@@ -1046,6 +1433,7 @@ export default function ChatPage() {
               onSelectSession={(sid) => { setCurrentSessionId(sid); setLocation(`/chat/${sid}`); }}
               onLogout={() => logoutMutation.mutateAsync().then(() => setLocation("/"))}
               onIntegrations={() => setLocation("/integrations")}
+              onSettings={() => setSettingsOpen(true)}
             />
           </motion.aside>
         )}

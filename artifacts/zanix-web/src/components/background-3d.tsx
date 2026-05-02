@@ -63,7 +63,7 @@ export function Background3D() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) return;
 
     let w = 0, h = 0, rafId = 0;
