@@ -1,112 +1,74 @@
 import type { ToolDefinition, ToolResult } from "./types.js";
 import OpenAI from "openai";
-import { deductCredits, getAgentPersonality, type AgentPersonality } from "@workspace/db";
 
 let _openaiInstance: OpenAI | null = null;
-  function getOpenAI(): OpenAI {
-    if (!_openaiInstance) {
-      _openaiInstance = new OpenAI({
-        apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
-        baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
-      });
-    }
-    return _openaiInstance;
+function getOpenAI(): OpenAI {
+  if (!_openaiInstance) {
+    _openaiInstance = new OpenAI({
+      apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
+      baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
+    });
   }
+  return _openaiInstance;
+}
 
-async function analyzeData(
-  userId: string,
-  data: string,
-  question: string,
-  outputFormat: string,
-  agentPersonality?: AgentPersonality
-): Promise<ToolResult> {
+async function analyzeData(data: string, question: string, outputFormat: string): Promise<ToolResult> {
   try {
-    const LLM_COST_PER_TOKEN = 0.0000015; // Example cost, adjust as needed
-    const estimatedTokens = Math.ceil((data.length + question.length) / 4); // Rough estimate
-    const cost = estimatedTokens * LLM_COST_PER_TOKEN;
-
-    const creditsDeducted = await deductCredits(userId, cost, `Data analysis (${outputFormat})`);
-    if (!creditsDeducted) {
-      return { success: false, output: null, error: "Insufficient credits for data analysis." };
-    }
-
-    const agentName = agentPersonality?.name || "Zanix AI";
-    const agentDescription = agentPersonality?.description || "an expert data analyst";
-    const agentTone = agentPersonality?.tone || "accurate and insightful";
-
-    const systemPrompt = `You are ${agentName}, ${agentDescription}. Your tone is ${agentTone}.
-Analyze the provided data and answer the question accurately.
-Output format: ${outputFormat}.
-For 'json': return structured JSON with findings, insights, and statistics.
-For 'table': return a markdown table with organized data.
-For 'narrative': write a clear analytical paragraph.
-For 'bullets': use bullet points for key findings.`;
+    const systemPrompt = `You are Zanix AI's data analysis engine — an expert data analyst, statistician, and business intelligence specialist.
+Analyze the provided data and answer the question accurately and thoroughly.
+Output format: ${outputFormat}
+- 'json': Return structured JSON with: {"findings": [...], "insights": [...], "statistics": {...}, "conclusion": "..."}
+- 'table': Return a well-formatted markdown table with organized data.
+- 'narrative': Write a clear, insightful analytical paragraph with supporting evidence.
+- 'bullets': Use bullet points for key findings and patterns.
+Always include: trends, patterns, anomalies, statistics (min/max/avg if applicable), and actionable insights.`;
 
     const response = await getOpenAI().chat.completions.create({
       model: "gpt-5.2",
       messages: [
         { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Data to analyze:\n\`\`\`\n${data.substring(0, 10000)}\n\`\`\`\n\nQuestion: ${question}`,
-        },
+        { role: "user", content: `Data to analyze:\n\`\`\`\n${data.substring(0, 10000)}\n\`\`\`\n\nQuestion/Task: ${question}` },
       ],
       max_completion_tokens: 2048,
     });
 
+    const content = response.choices[0]?.message?.content ?? "";
+
+    let parsedOutput: unknown = content;
+    if (outputFormat === "json") {
+      try { parsedOutput = JSON.parse(content); }
+      catch { parsedOutput = content; }
+    }
+
     return {
       success: true,
       output: {
-        analysis: response.choices[0]?.message?.content ?? "",
+        analysis: parsedOutput,
         question,
         outputFormat,
         dataLength: data.length,
+        dataLines: data.split("\n").length,
+        tokensUsed: response.usage?.total_tokens ?? 0,
       },
     };
   } catch (err) {
-    return {
-      success: false,
-      output: null,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return { success: false, output: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 export const dataAnalyzerTool: ToolDefinition = {
   name: "analyze_data",
-  description:
-    "Analyze any data (text, JSON, CSV, numbers, tables) and extract insights, patterns, or answer specific questions about it.",
+  description: "Analyze any structured or unstructured data — JSON, CSV, tables, numbers, text datasets — to extract insights, patterns, statistics, trends, and anomalies. Answer specific questions about data or perform exploratory analysis.",
   parameters: {
-    userId: {
-      type: "string",
-      description: "The user ID for credit deduction",
-      required: true,
-    },
-    data: {
-      type: "string",
-      description: "The data to analyze (text, JSON, CSV, numbers, etc.)",
-      required: true,
-    },
-    question: {
-      type: "string",
-      description: "The specific question or analysis task to perform on the data",
-      required: true,
-    },
-    outputFormat: {
-      type: "string",
-      description: "Output format: 'json', 'table', 'narrative', or 'bullets'",
-      required: false,
-    },
+    data:         { type: "string", description: "The data to analyze (JSON, CSV, plain text, numbers, markdown table, etc.)", required: true },
+    question:     { type: "string", description: "Specific question or analysis task (e.g., 'What are the top trends?', 'Summarize key metrics')", required: true },
+    outputFormat: { type: "string", description: "Output format: 'json' | 'table' | 'narrative' | 'bullets' (default: bullets)", required: false },
   },
   execute: async (params) => {
-    const userId = String(params.userId);
-    const agentPersonality = await getAgentPersonality(userId);
     return analyzeData(
-      userId,
       String(params.data),
       String(params.question),
-      String(params.outputFormat ?? "bullets"),
-      agentPersonality
+      String(params.outputFormat ?? "bullets")
     );
   },
 };

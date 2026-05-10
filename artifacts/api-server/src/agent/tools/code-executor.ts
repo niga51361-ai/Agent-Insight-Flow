@@ -2,213 +2,120 @@ import type { ToolDefinition, ToolResult } from "./types.js";
 import { spawn } from "child_process";
 import vm from "vm";
 import fs from "fs";
-import { deductCredits } from "@workspace/db";
+import os from "os";
+import path from "path";
 
+async function executeJavaScript(code: string, timeoutMs: number): Promise<ToolResult> {
+  const logs: string[] = [];
+  const errors: string[] = [];
 
-async function executeJavaScript(userId: string, code: string, timeoutMs: number): Promise<ToolResult> {
-  const JS_EXECUTION_COST = 0.001; // Example cost
-  const creditsDeducted = await deductCredits(userId, JS_EXECUTION_COST, "JavaScript execution");
-  if (!creditsDeducted) {
-    return { success: false, output: null, error: "Insufficient credits for JavaScript execution." };
-  }
+  const sandbox = {
+    console: {
+      log: (...args: unknown[]) => logs.push(args.map(a => typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)).join(" ")),
+      error: (...args: unknown[]) => errors.push(args.map(String).join(" ")),
+      warn: (...args: unknown[]) => logs.push("[WARN] " + args.map(String).join(" ")),
+      info: (...args: unknown[]) => logs.push("[INFO] " + args.map(String).join(" ")),
+      table: (d: unknown) => logs.push(JSON.stringify(d, null, 2)),
+    },
+    Math, JSON, parseInt, parseFloat, isNaN, isFinite,
+    Array, Object, String, Number, Boolean, Date, RegExp,
+    Map, Set, Promise, Error, TypeError, RangeError,
+    encodeURIComponent, decodeURIComponent,
+  };
 
   return new Promise((resolve) => {
-    const logs: string[] = [];
-    const errors: string[] = [];
-
-    const sandbox = {
-      console: {
-        log: (...args: unknown[]) => logs.push(args.map(String).join(" ")),
-        error: (...args: unknown[]) => errors.push(args.map(String).join(" ")),
-        warn: (...args: unknown[]) => logs.push("[WARN] " + args.map(String).join(" ")),
-        info: (...args: unknown[]) => logs.push("[INFO] " + args.map(String).join(" ")),
-      },
-      Math,
-      JSON,
-      parseInt,
-      parseFloat,
-      isNaN,
-      isFinite,
-      Array,
-      Object,
-      String,
-      Number,
-      Boolean,
-      Date,
-      RegExp,
-      Map,
-      Set,
-      Promise,
-      setTimeout: undefined,
-      setInterval: undefined,
-      fetch: undefined,
-      require: undefined,
-      process: undefined,
-      __dirname: undefined,
-      __filename: undefined,
-      global: undefined,
-    };
-
     try {
       const context = vm.createContext(sandbox);
-      const result = vm.runInContext(code, context, {
-        timeout: timeoutMs,
-        displayErrors: true,
-      });
-
+      const result = vm.runInContext(code, context, { timeout: timeoutMs, displayErrors: true });
       resolve({
         success: true,
         output: {
           language: "javascript",
-          stdout: logs.join("\n"),
+          stdout: logs.join("\n") || "(no output)",
           stderr: errors.join("\n"),
-          returnValue: result !== undefined ? String(result) : undefined,
+          returnValue: result !== undefined ? (typeof result === "object" ? JSON.stringify(result, null, 2) : String(result)) : undefined,
           executionTime: `<${timeoutMs}ms`,
         },
       });
     } catch (err) {
       resolve({
         success: false,
-        output: {
-          language: "javascript",
-          stdout: logs.join("\n"),
-          stderr: errors.join("\n"),
-          error: err instanceof Error ? err.message : String(err),
-        },
+        output: { language: "javascript", stdout: logs.join("\n"), stderr: errors.join("\n") },
         error: err instanceof Error ? err.message : String(err),
       });
     }
   });
 }
 
-async function executePythonInDocker(userId: string, code: string, timeoutMs: number): Promise<ToolResult> {
-  const PYTHON_EXECUTION_COST = 0.002; // Example cost
-  const creditsDeducted = await deductCredits(userId, PYTHON_EXECUTION_COST, "Python execution");
-  if (!creditsDeducted) {
-    return { success: false, output: null, error: "Insufficient credits for Python execution." };
-  }
-
-  const containerName = `python-executor-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-  const tempFileName = `/tmp/${containerName}.py`;
-
-  // Write the Python code to a temporary file
-  await fs.promises.writeFile(tempFileName, code);
-
-  const dockerCommand = [
-    "docker", "run", "--rm",
-    "--name", containerName,
-    "-v", `${tempFileName}:/app/script.py:ro`,
-    "python:3.10-slim", "python", "/app/script.py"
-  ];
+async function executePython(code: string, timeoutMs: number): Promise<ToolResult> {
+  const tmpFile = path.join(os.tmpdir(), `zanix_${Date.now()}_${Math.random().toString(36).slice(2)}.py`);
+  await fs.promises.writeFile(tmpFile, code, "utf8");
 
   return new Promise((resolve) => {
     const startTime = Date.now();
-
     let stdout = "";
     let stderr = "";
+    let killed = false;
 
-    const child = spawn(dockerCommand[0], dockerCommand.slice(1), {
-      timeout: timeoutMs,
+    const child = spawn("python3", [tmpFile], {
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.stdout?.on("data", (data: Buffer) => {
-      stdout += data.toString();
-      if (stdout.length > 50000) {
-        child.kill();
-      }
-    });
+    const timer = setTimeout(() => {
+      killed = true;
+      child.kill("SIGTERM");
+    }, timeoutMs);
 
-    child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
+    child.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); if (stdout.length > 50000) { killed = true; child.kill(); } });
+    child.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
 
     child.on("close", async (code) => {
+      clearTimeout(timer);
+      await fs.promises.unlink(tmpFile).catch(() => {});
       const elapsed = Date.now() - startTime;
-      // Clean up the temporary file
-      await fs.promises.unlink(tempFileName);
+      if (killed && stdout.length > 50000) {
+        resolve({ success: false, output: { language: "python", stdout: stdout.slice(0, 5000), stderr }, error: "Output exceeded 50KB limit" });
+        return;
+      }
+      if (killed) {
+        resolve({ success: false, output: { language: "python", stdout: stdout.slice(0, 5000), stderr }, error: `Execution timed out after ${timeoutMs}ms` });
+        return;
+      }
       if (code === 0) {
-        resolve({
-          success: true,
-          output: {
-            language: "python",
-            stdout: stdout.substring(0, 10000),
-            stderr: stderr.substring(0, 2000),
-            exitCode: code,
-            executionTime: `${elapsed}ms`,
-          },
-        });
+        resolve({ success: true, output: { language: "python", stdout: stdout.slice(0, 10000) || "(no output)", stderr: stderr.slice(0, 2000), exitCode: 0, executionTime: `${elapsed}ms` } });
       } else {
-        resolve({
-          success: false,
-          output: {
-            language: "python",
-            stdout: stdout.substring(0, 5000),
-            stderr: stderr.substring(0, 5000),
-            exitCode: code,
-            executionTime: `${elapsed}ms`,
-          },
-          error: stderr.substring(0, 500) || "Python execution failed",
-        });
+        resolve({ success: false, output: { language: "python", stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000), exitCode: code, executionTime: `${elapsed}ms` }, error: stderr.slice(0, 500) || "Execution failed" });
       }
     });
 
     child.on("error", async (err) => {
-      // Clean up the temporary file in case of spawn error
-      await fs.promises.unlink(tempFileName);
-      resolve({
-        success: false,
-        output: null,
-        error: err.message.includes("ENOENT")
-          ? "Docker or Python is not available in this environment, or an internal error occurred."
-          : err.message,
-      });
+      clearTimeout(timer);
+      await fs.promises.unlink(tmpFile).catch(() => {});
+      if (err.message.includes("ENOENT")) {
+        resolve({ success: false, output: null, error: "python3 not found. Install it with: apt-get install python3" });
+      } else {
+        resolve({ success: false, output: null, error: err.message });
+      }
     });
   });
 }
 
 export const codeExecutorTool: ToolDefinition = {
   name: "execute_code",
-  description:
-    "Execute code in a safe sandbox environment. Supports JavaScript (with math, array, string operations) and Python (for data processing, calculations, algorithms). Returns stdout output and any errors. Use this to run, test, and verify code logic.",
+  description: "Execute code in a real runtime environment. JavaScript runs in a secure Node.js VM sandbox. Python runs with python3 directly. Returns actual stdout, stderr, and execution results. Use to verify code logic, run calculations, process data, or test algorithms.",
   parameters: {
-    userId: {
-      type: "string",
-      description: "The user ID for credit deduction",
-      required: true,
-    },
-
-    code: {
-      type: "string",
-      description: "The code to execute",
-      required: true,
-    },
-    language: {
-      type: "string",
-      description: "Programming language: 'javascript' or 'python'",
-      required: true,
-    },
-    timeout: {
-      type: "number",
-      description: "Execution timeout in milliseconds (default: 10000, max: 30000)",
-      required: false,
-    },
+    code:     { type: "string", description: "The code to execute", required: true },
+    language: { type: "string", description: "Programming language: 'javascript' or 'python'", required: true },
+    timeout:  { type: "number", description: "Execution timeout in ms (default: 10000, max: 30000)", required: false },
   },
   execute: async (params) => {
-    const userId = String(params.userId);
-    const lang = String(params.language).toLowerCase();
-    const code = String(params.code);
+    const lang    = String(params.language ?? "javascript").toLowerCase();
+    const code    = String(params.code ?? "");
     const timeout = Math.min(Number(params.timeout ?? 10000), 30000);
-
-    if (lang === "javascript" || lang === "js") {
-      return executeJavaScript(userId, code, timeout);
-    } else if (lang === "python" || lang === "py") {
-      return executePythonInDocker(userId, code, timeout);
-    } else {
-      return {
-        success: false,
-        output: null,
-        error: `Unsupported language: ${lang}. Use 'javascript' or 'python'.`,
-      };
-    }
+    if (!code.trim()) return { success: false, output: null, error: "Code cannot be empty." };
+    if (lang === "javascript" || lang === "js") return executeJavaScript(code, timeout);
+    if (lang === "python"     || lang === "py") return executePython(code, timeout);
+    return { success: false, output: null, error: `Unsupported language: "${lang}". Use 'javascript' or 'python'.` };
   },
 };
