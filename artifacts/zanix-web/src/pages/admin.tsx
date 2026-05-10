@@ -9,7 +9,7 @@ import {
   Terminal, Sparkles, Plus, Save, RotateCcw, Table2,
   Play, FileText, Copy, Check, ChevronDown, ChevronUp,
   History, Bot, Lock, Unlock, AlertCircle, MemoryStick,
-  X, Loader2, Hash, Info,
+  X, Loader2, Hash, Info, BookOpen, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ZanixLogo from "@/components/zanix-logo";
@@ -45,6 +45,7 @@ const NAV = [
   { id: "secrets",    label: "مفاتيح API",       icon: KeyRound },
   { id: "database",   label: "قاعدة البيانات",   icon: Database },
   { id: "agent",      label: "إعداد الوكيل",     icon: Cpu },
+  { id: "access",     label: "طريقة الدخول",     icon: BookOpen },
   { id: "audit",      label: "سجل الأحداث",      icon: History },
   { id: "system",     label: "مراقبة النظام",    icon: Server },
 ] as const;
@@ -295,6 +296,7 @@ export default function AdminPage() {
           {nav === "secrets" && <SecretsSection secrets={secrets} envVars={envVars} onRefresh={() => refresh("secrets")} showToast={showToast} />}
           {nav === "database" && <DatabaseSection tables={dbTables} showToast={showToast} />}
           {nav === "agent" && agentConfig && <AgentConfigSection config={agentConfig} />}
+          {nav === "access" && <AccessGuideSection />}
           {nav === "audit" && <AuditSection logs={auditLogs} />}
           {nav === "system" && systemInfo && <SystemSection info={systemInfo} />}
         </div>
@@ -1164,6 +1166,206 @@ function SystemSection({ info }: { info: any }) {
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", e.set ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-white/20 bg-white/4 border-white/8")}>
                   {e.set ? "✓ مُعيَّن" : "✗ غير مُعيَّن"}
                 </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ACCESS GUIDE SECTION
+// ════════════════════════════════════════════════════════════════
+function AccessGuideSection() {
+  const SUGGESTED_KEYS = [
+    {
+      key: "SERPER_API_KEY",
+      name: "Serper Search API",
+      icon: "🔍",
+      desc: "بحث Google في الوقت الفعلي — 2500 بحث/شهر مجاناً",
+      url: "https://serper.dev",
+      badge: "مجاني",
+      badgeColor: "text-emerald-400 border-emerald-500/20 bg-emerald-500/8",
+    },
+    {
+      key: "ELEVENLABS_API_KEY",
+      name: "ElevenLabs Voice",
+      icon: "🎙️",
+      desc: "تحويل النص إلى كلام بجودة احترافية",
+      url: "https://elevenlabs.io",
+      badge: "مجاني جزئياً",
+      badgeColor: "text-blue-400 border-blue-500/20 bg-blue-500/8",
+    },
+    {
+      key: "ANTHROPIC_API_KEY",
+      name: "Anthropic Claude",
+      icon: "🧠",
+      desc: "نماذج Claude 3.5 Sonnet — بديل قوي لـ GPT",
+      url: "https://console.anthropic.com",
+      badge: "مدفوع",
+      badgeColor: "text-orange-400 border-orange-500/20 bg-orange-500/8",
+    },
+    {
+      key: "STABILITY_API_KEY",
+      name: "Stability AI",
+      icon: "🎨",
+      desc: "توليد صور بنماذج Stable Diffusion المتقدمة",
+      url: "https://platform.stability.ai",
+      badge: "مجاني جزئياً",
+      badgeColor: "text-pink-400 border-pink-500/20 bg-pink-500/8",
+    },
+    {
+      key: "REPLICATE_API_TOKEN",
+      name: "Replicate",
+      icon: "🔄",
+      desc: "نماذج مفتوحة المصدر: Llama, Flux, Whisper وغيرها",
+      url: "https://replicate.com",
+      badge: "مجاني جزئياً",
+      badgeColor: "text-cyan-400 border-cyan-500/20 bg-cyan-500/8",
+    },
+    {
+      key: "TAVILY_API_KEY",
+      name: "Tavily Search",
+      icon: "🕵️",
+      desc: "محرك بحث مصمم خصيصاً لوكلاء الذكاء الاصطناعي",
+      url: "https://tavily.com",
+      badge: "مجاني جزئياً",
+      badgeColor: "text-violet-400 border-violet-500/20 bg-violet-500/8",
+    },
+  ];
+
+  const adminSql    = `UPDATE users SET role = 'admin' WHERE email = 'your@email.com';`;
+  const adminUrl    = typeof window !== "undefined" ? `${window.location.origin}/admin` : "/admin";
+
+  const steps = [
+    {
+      step: 1,
+      title: "سجّل حساباً في التطبيق",
+      desc: "اذهب إلى /auth وأنشئ حساباً بإيميلك وكلمة المرور",
+      color: "bg-primary/12 border-primary/28 text-primary",
+    },
+    {
+      step: 2,
+      title: "اجعل حسابك مديراً عبر SQL",
+      desc: "شغّل الأمر أدناه في قسم «قاعدة البيانات ← SQL Console» أو عبر أدوات قاعدة البيانات مباشرةً",
+      color: "bg-amber-500/12 border-amber-500/28 text-amber-400",
+      code: adminSql,
+    },
+    {
+      step: 3,
+      title: "سجّل خروجاً ودخولاً مجدداً",
+      desc: "أعد تسجيل الدخول حتى يتم تحديث الجلسة بصلاحيات المدير",
+      color: "bg-emerald-500/12 border-emerald-500/28 text-emerald-400",
+    },
+    {
+      step: 4,
+      title: "أضف مفاتيح API",
+      desc: "اذهب إلى قسم «مفاتيح API» وأضف المفاتيح المطلوبة لتفعيل الميزات المتقدمة",
+      color: "bg-cyan-500/12 border-cyan-500/28 text-cyan-400",
+    },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-2xl" dir="rtl">
+      <div>
+        <h2 className="text-base font-bold text-white/80 mb-1">دليل الإعداد والدخول</h2>
+        <p className="text-xs text-white/35">اتبع هذه الخطوات لإعداد لوحة الإدارة وإضافة مفاتيح API المطلوبة</p>
+      </div>
+
+      {/* Admin URL */}
+      <div className="rounded-2xl border border-primary/18 bg-primary/[0.04] overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-primary/10">
+          <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/28 flex items-center justify-center shrink-0">
+            <ExternalLink className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <p className="text-xs font-bold text-white/65">رابط لوحة الإدارة</p>
+        </div>
+        <div className="p-4 flex items-center gap-3">
+          <code className="flex-1 text-xs font-mono text-primary/75 bg-primary/8 border border-primary/15 rounded-xl px-3 py-2.5 truncate">
+            {adminUrl}
+          </code>
+          <CopyBtn text={adminUrl} />
+        </div>
+      </div>
+
+      {/* Step-by-step setup */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.05]">
+          <p className="text-xs font-bold text-white/55">خطوات الإعداد الأولي</p>
+        </div>
+        <div className="p-4 space-y-5">
+          {steps.map((s) => (
+            <div key={s.step} className="flex gap-3.5">
+              <div className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 border mt-0.5",
+                s.color
+              )}>
+                {s.step}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white/70 mb-0.5">{s.title}</p>
+                <p className="text-[11px] text-white/35 leading-relaxed">{s.desc}</p>
+                {s.code && (
+                  <div className="mt-2.5 relative group/code rounded-xl border border-amber-500/15 bg-amber-500/[0.04] overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-amber-500/10">
+                      <span className="text-[9px] font-bold text-amber-400/50 uppercase tracking-widest">SQL</span>
+                      <CopyBtn text={s.code} />
+                    </div>
+                    <code className="block text-[11px] font-mono text-amber-300/80 px-3 py-2.5 overflow-x-auto">
+                      {s.code}
+                    </code>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SQL console hint */}
+      <div className="flex items-start gap-3 p-4 rounded-2xl border border-cyan-500/14 bg-cyan-500/[0.04]">
+        <Terminal className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-bold text-cyan-400/90 mb-1">تشغيل SQL مباشرةً من اللوحة</p>
+          <p className="text-[11px] text-white/35 leading-relaxed">
+            يمكنك تنفيذ أمر SQL الخاص بمنح الصلاحيات مباشرةً من قسم{" "}
+            <span className="text-white/55 font-semibold">قاعدة البيانات → SQL Console</span>{" "}
+            دون الحاجة إلى أدوات خارجية.
+          </p>
+        </div>
+      </div>
+
+      {/* Suggested API keys */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-white/[0.05]">
+          <KeyRound className="w-4 h-4 text-amber-400/55" />
+          <p className="text-xs font-bold text-white/55">مفاتيح API المقترحة</p>
+          <span className="text-[10px] text-white/22 mr-1">أضفها من قسم «مفاتيح API»</span>
+        </div>
+        <div className="divide-y divide-white/[0.04]">
+          {SUGGESTED_KEYS.map((k) => (
+            <div key={k.key} className="flex items-start gap-3.5 px-4 py-3.5 hover:bg-white/[0.018] transition-colors">
+              <div className="text-xl shrink-0 mt-0.5 select-none">{k.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  <p className="text-xs font-bold text-white/70">{k.name}</p>
+                  <span className={cn(
+                    "text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
+                    k.badgeColor
+                  )}>{k.badge}</span>
+                </div>
+                <p className="text-[11px] text-white/35 mb-2">{k.desc}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="text-[10px] font-mono text-white/45 bg-white/[0.05] border border-white/8 px-2 py-0.5 rounded-lg">
+                    {k.key}
+                  </code>
+                  <a href={k.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] text-primary/60 hover:text-primary transition-colors">
+                    احصل عليه <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
               </div>
             </div>
           ))}
