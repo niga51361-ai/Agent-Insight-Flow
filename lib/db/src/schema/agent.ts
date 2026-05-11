@@ -33,6 +33,7 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   id: serial("id").primaryKey(),
   sessionId: text("session_id").notNull().unique(),
   title: text("title"),
+  userId: integer("user_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -66,7 +67,7 @@ export const agentStepsTable = pgTable("agent_steps", {
 
 export const agentPersonalitiesTable = pgTable("agent_personalities", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique(), // Link to users table
+  userId: text("user_id").notNull().unique(),
   name: text("name").notNull().default("Zanix AI"),
   description: text("description"),
   tone: text("tone").default("helpful and professional"),
@@ -80,7 +81,7 @@ export const agentMemoryTable = pgTable("agent_memory", {
   memoryType: text("memory_type").notNull().default("fact"),
   key: text("key").notNull(),
   value: text("value").notNull(),
-  embedding: jsonb("embedding"), // Store as JSONB for vector embeddings
+  embedding: jsonb("embedding"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"),
 });
@@ -95,11 +96,21 @@ export const agentArtifactsTable = pgTable("agent_artifacts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertAgentSessionSchema = createInsertSchema(agentSessionsTable).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertAgentTaskSchema = createInsertSchema(agentTasksTable).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertAgentStepSchema = createInsertSchema(agentStepsTable).omit({ id: true, createdAt: true });
-export const insertAgentMemorySchema = createInsertSchema(agentMemoryTable).omit({ id: true, createdAt: true });
-export const insertAgentArtifactSchema = createInsertSchema(agentArtifactsTable).omit({ id: true, createdAt: true });
+export const insertAgentSessionSchema = createInsertSchema(agentSessionsTable).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAgentTaskSchema = createInsertSchema(agentTasksTable).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAgentStepSchema = createInsertSchema(agentStepsTable).omit({
+  id: true, createdAt: true,
+});
+export const insertAgentMemorySchema = createInsertSchema(agentMemoryTable).omit({
+  id: true, createdAt: true,
+});
+export const insertAgentArtifactSchema = createInsertSchema(agentArtifactsTable).omit({
+  id: true, createdAt: true,
+});
 
 export type AgentSession = typeof agentSessionsTable.$inferSelect;
 export type AgentTask = typeof agentTasksTable.$inferSelect;

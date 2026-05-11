@@ -1,7 +1,8 @@
 import { db } from "@workspace/db";
 import { agentMemoryTable } from "@workspace/db";
-import { eq, and, like, or, gt } from "drizzle-orm";
+import { eq, and, like, or } from "drizzle-orm";
 import { logger } from "../../lib/logger.js";
+import { getOpenAI } from "../../lib/openai.js";
 
 export interface HybridSearchResult {
   key: string;
@@ -11,6 +12,7 @@ export interface HybridSearchResult {
   matchType: "keyword" | "semantic" | "hybrid";
 }
 
+// ─── Keyword Score ────────────────────────────────────────────────────────────
 function keywordScore(text: string, query: string): number {
   const queryTokens = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
   const textLower = text.toLowerCase();
@@ -18,87 +20,122 @@ function keywordScore(text: string, query: string): number {
   if (queryTokens.length === 0) return 0;
 
   let matches = 0;
-  let exactPhraseBonus = 0;
-
   for (const token of queryTokens) {
-    if (textLower.includes(token)) {
-      matches++;
-    }
+    if (textLower.includes(token)) matches++;
   }
 
-  if (textLower.includes(query.toLowerCase())) {
-    exactPhraseBonus = 0.5;
-  }
-
-  return (matches / queryTokens.length) + exactPhraseBonus;
+  const exactPhraseBonus = textLower.includes(query.toLowerCase()) ? 0.5 : 0;
+  return matches / queryTokens.length + exactPhraseBonus;
 }
 
-function semanticScore(text: string, query: string): number {
-  const queryTokens = new Set(query.toLowerCase().split(/\s+/).filter((t) => t.length > 3));
-  const textTokens = new Set(text.toLowerCase().split(/\s+/).filter((t) => t.length > 3));
-
-  if (queryTokens.size === 0) return 0;
-
-  let intersection = 0;
-  for (const token of queryTokens) {
-    if (textTokens.has(token)) intersection++;
+// ─── Cosine Similarity ────────────────────────────────────────────────────────
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    const ai = a[i] ?? 0;
+    const bi = b[i] ?? 0;
+    dot += ai * bi;
+    normA += ai * ai;
+    normB += bi * bi;
   }
-
-  const union = queryTokens.size + textTokens.size - intersection;
-  return union > 0 ? intersection / union : 0;
+  return normA > 0 && normB > 0 ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
 }
 
+// ─── Real Embedding via OpenAI ────────────────────────────────────────────────
+async function getQueryEmbedding(query: string): Promise<number[] | null> {
+  try {
+    const response = await getOpenAI().embeddings.create({
+      model: "text-embedding-3-small",
+      input: query.substring(0, 8000),
+    });
+    return response.data[0]?.embedding ?? null;
+  } catch (err) {
+    logger.warn({ err }, "Failed to get query embedding — falling back to keyword-only");
+    return null;
+  }
+}
+
+// ─── Hybrid Search ────────────────────────────────────────────────────────────
 export async function hybridSearch(
   sessionId: string,
   query: string,
   limit: number = 10
 ): Promise<HybridSearchResult[]> {
   try {
+    // Fast keyword pre-filter to get candidates
     const queryTokens = query
       .split(/\s+/)
       .filter((t) => t.length > 2)
       .slice(0, 5);
 
-    const conditions = [eq(agentMemoryTable.sessionId, sessionId)];
+    const baseCondition = eq(agentMemoryTable.sessionId, sessionId);
 
-    if (queryTokens.length > 0) {
-      const keywordConditions = queryTokens.map((token) =>
-        or(
-          like(agentMemoryTable.key, `%${token}%`),
-          like(agentMemoryTable.value, `%${token}%`)
-        )
-      );
-      conditions.push(or(...(keywordConditions as any[])) as any);
-    }
+    const dbConditions =
+      queryTokens.length > 0
+        ? and(
+            baseCondition,
+            or(
+              ...(queryTokens.map((token) =>
+                or(
+                  like(agentMemoryTable.key, `%${token}%`),
+                  like(agentMemoryTable.value, `%${token}%`)
+                )
+              ) as any[])
+            ) as any
+          )
+        : baseCondition;
 
-    const candidates = await db
-      .select({
-        key: agentMemoryTable.key,
-        value: agentMemoryTable.value,
-        memoryType: agentMemoryTable.memoryType,
-        expiresAt: agentMemoryTable.expiresAt,
-      })
-      .from(agentMemoryTable)
-      .where(and(...conditions))
-      .limit(50);
+    // Run keyword DB query and embedding generation in parallel
+    const [candidates, queryEmbedding] = await Promise.all([
+      db
+        .select({
+          key: agentMemoryTable.key,
+          value: agentMemoryTable.value,
+          memoryType: agentMemoryTable.memoryType,
+          embedding: agentMemoryTable.embedding,
+          expiresAt: agentMemoryTable.expiresAt,
+        })
+        .from(agentMemoryTable)
+        .where(dbConditions)
+        .limit(100),
+      getQueryEmbedding(query),
+    ]);
 
     const now = new Date();
-    const valid = candidates.filter(
-      (c) => !c.expiresAt || c.expiresAt > now
-    );
+    const valid = candidates.filter((c) => !c.expiresAt || c.expiresAt > now);
 
     const scored: HybridSearchResult[] = valid.map((record) => {
       const fullText = `${record.key} ${record.value}`;
       const kw = keywordScore(fullText, query);
-      const sem = semanticScore(fullText, query);
 
-      const kwWeight = 0.55;
-      const semWeight = 0.45;
+      const storedEmbedding = Array.isArray(record.embedding)
+        ? (record.embedding as number[])
+        : null;
+
+      const hasEmbedding =
+        queryEmbedding !== null &&
+        storedEmbedding !== null &&
+        storedEmbedding.length > 0;
+
+      const sem = hasEmbedding
+        ? cosineSimilarity(queryEmbedding!, storedEmbedding!)
+        : 0;
+
+      // When real embeddings are available, weight semantics higher
+      const kwWeight = hasEmbedding ? 0.35 : 1.0;
+      const semWeight = hasEmbedding ? 0.65 : 0.0;
       const score = kw * kwWeight + sem * semWeight;
 
       let matchType: HybridSearchResult["matchType"] = "hybrid";
-      if (kw > 0.7 && sem < 0.3) matchType = "keyword";
-      else if (sem > 0.5 && kw < 0.3) matchType = "semantic";
+      if (hasEmbedding) {
+        if (sem > 0.65 && kw < 0.3) matchType = "semantic";
+        else if (kw > 0.7 && sem < 0.2) matchType = "keyword";
+      } else {
+        matchType = "keyword";
+      }
 
       return {
         key: record.key,
@@ -115,7 +152,12 @@ export async function hybridSearch(
       .slice(0, limit);
 
     logger.info(
-      { sessionId, query: query.substring(0, 50), resultCount: results.length },
+      {
+        sessionId,
+        query: query.substring(0, 50),
+        resultCount: results.length,
+        embeddingsUsed: queryEmbedding !== null,
+      },
       "Hybrid search completed"
     );
 
@@ -126,6 +168,7 @@ export async function hybridSearch(
   }
 }
 
+// ─── Keyword-only fallback ────────────────────────────────────────────────────
 export async function keywordOnlySearch(
   sessionId: string,
   exactTerm: string,

@@ -9,12 +9,13 @@ import {
   orchestrationsTable,
   subAgentRunsTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { createDefaultRegistry } from "../agent/tools/registry.js";
 import { MemoryManager } from "../agent/memory/manager.js";
 import { runAgent } from "../agent/executor/runner.js";
 import { orchestrate } from "../agent/executor/orchestrator.js";
+import { getSessionUserId } from "../middleware/requireAuth.js";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,8 @@ const CreateTaskBody = z.object({
   images: z.array(z.string()).optional(),
 });
 
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+
 router.post("/sessions", async (req: Request, res: Response) => {
   const parsed = CreateSessionBody.safeParse(req.body);
   if (!parsed.success) {
@@ -36,29 +39,43 @@ router.post("/sessions", async (req: Request, res: Response) => {
     return;
   }
 
+  const userId = getSessionUserId(req) ?? null;
   const sessionId = randomUUID();
+
   const [session] = await db
     .insert(agentSessionsTable)
     .values({
       sessionId,
       title: parsed.data.title ?? `Session ${new Date().toLocaleDateString()}`,
+      userId,
     })
     .returning();
 
   res.json({ session });
 });
 
-router.get("/sessions", async (_req: Request, res: Response) => {
+router.get("/sessions", async (req: Request, res: Response) => {
+  const userId = getSessionUserId(req);
+
+  if (!userId) {
+    res.json({ sessions: [] });
+    return;
+  }
+
   const sessions = await db
     .select()
     .from(agentSessionsTable)
+    .where(eq(agentSessionsTable.userId, userId))
     .orderBy(desc(agentSessionsTable.createdAt))
     .limit(50);
+
   res.json({ sessions });
 });
 
 router.get("/sessions/:sessionId", async (req: Request, res: Response) => {
   const { sessionId } = req.params as { sessionId: string };
+  const userId = getSessionUserId(req);
+
   const [session] = await db
     .select()
     .from(agentSessionsTable)
@@ -67,6 +84,12 @@ router.get("/sessions/:sessionId", async (req: Request, res: Response) => {
 
   if (!session) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  // Ownership check: deny if session belongs to a different user
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -79,6 +102,8 @@ router.get("/sessions/:sessionId", async (req: Request, res: Response) => {
   res.json({ session, tasks });
 });
 
+// ─── Tasks ────────────────────────────────────────────────────────────────────
+
 router.post("/tasks", async (req: Request, res: Response) => {
   const parsed = CreateTaskBody.safeParse(req.body);
   if (!parsed.success) {
@@ -87,6 +112,7 @@ router.post("/tasks", async (req: Request, res: Response) => {
   }
 
   const { sessionId, goal } = parsed.data;
+  const userId = getSessionUserId(req);
 
   const [session] = await db
     .select()
@@ -99,15 +125,15 @@ router.post("/tasks", async (req: Request, res: Response) => {
     return;
   }
 
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const taskId = randomUUID();
   const [task] = await db
     .insert(agentTasksTable)
-    .values({
-      sessionId,
-      taskId,
-      goal,
-      status: "pending",
-    })
+    .values({ sessionId, taskId, goal, status: "pending" })
     .returning();
 
   res.json({ task });
@@ -115,6 +141,7 @@ router.post("/tasks", async (req: Request, res: Response) => {
 
 router.post("/tasks/:taskId/run", async (req: Request, res: Response) => {
   const { taskId } = req.params as { taskId: string };
+  const userId = getSessionUserId(req);
 
   const [task] = await db
     .select()
@@ -132,6 +159,18 @@ router.post("/tasks/:taskId/run", async (req: Request, res: Response) => {
     return;
   }
 
+  // Verify session ownership
+  const [session] = await db
+    .select()
+    .from(agentSessionsTable)
+    .where(eq(agentSessionsTable.sessionId, task.sessionId))
+    .limit(1);
+
+  if (session && session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const registry = createDefaultRegistry(task.sessionId);
   const memory = new MemoryManager(task.sessionId);
   await memory.getAll();
@@ -143,9 +182,7 @@ router.post("/tasks/:taskId/run", async (req: Request, res: Response) => {
       task.goal,
       registry,
       memory,
-      (step) => {
-        req.log.info({ taskId, step }, "Agent step");
-      }
+      (step) => { req.log.info({ taskId, step }, "Agent step"); }
     );
 
     res.json({
@@ -185,6 +222,7 @@ router.post("/run", async (req: Request, res: Response) => {
   }
 
   const { sessionId, goal } = parsed.data;
+  const userId = getSessionUserId(req);
 
   const [session] = await db
     .select()
@@ -194,6 +232,11 @@ router.post("/run", async (req: Request, res: Response) => {
 
   if (!session) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -279,7 +322,10 @@ router.get("/tasks/:taskId/artifacts", async (req: Request, res: Response) => {
 });
 
 router.get("/tasks/:taskId/artifacts/:artifactId", async (req: Request, res: Response) => {
-  const { taskId, artifactId } = req.params as { taskId: string; artifactId: string };
+  const { taskId, artifactId } = req.params as {
+    taskId: string;
+    artifactId: string;
+  };
 
   const [artifact] = await db
     .select()
@@ -324,11 +370,9 @@ router.get("/tasks/:taskId/stream", async (req: Request, res: Response) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  // Add to SSE clients map
   if (!sseClients.has(taskId)) sseClients.set(taskId, new Set());
   sseClients.get(taskId)!.add(res);
 
-  // Send existing steps immediately
   const existingSteps = await db
     .select()
     .from(agentStepsTable)
@@ -348,7 +392,11 @@ router.get("/tasks/:taskId/stream", async (req: Request, res: Response) => {
   }
 
   if (task.status === "completed" || task.status === "failed") {
-    send("done", { status: task.status, result: task.result, error: task.errorMessage });
+    send("done", {
+      status: task.status,
+      result: task.result,
+      error: task.errorMessage,
+    });
     res.end();
     return;
   }
@@ -385,6 +433,7 @@ router.post("/run/stream", async (req: Request, res: Response) => {
 
   const { sessionId, goal, model, images } = parsed.data;
   const selectedModel = model ?? "gpt-5.2";
+  const userId = getSessionUserId(req);
 
   const [session] = await db
     .select()
@@ -394,6 +443,12 @@ router.post("/run/stream", async (req: Request, res: Response) => {
 
   if (!session) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  // Ownership check: deny access if session belongs to a different user
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -411,28 +466,34 @@ router.post("/run/stream", async (req: Request, res: Response) => {
 
   res.json({ taskId, status: "started" });
 
-  runAgent(taskId, sessionId, goal, registry, memory, (step) => {
-    broadcastTaskEvent(taskId, "step", {
-      stepIndex: step.stepIndex,
-      type: step.stepType,
-      thought: step.thought,
-      toolName: step.toolName,
-      toolInput: step.toolInput,
-      observation: step.observation,
-      status: step.status,
+  runAgent(taskId, sessionId, goal, registry, memory,
+    (step) => {
+      broadcastTaskEvent(taskId, "step", {
+        stepIndex: step.stepIndex,
+        type: step.stepType,
+        thought: step.thought,
+        toolName: step.toolName,
+        toolInput: step.toolInput,
+        observation: step.observation,
+        status: step.status,
+      });
+    },
+    selectedModel,
+    images
+  )
+    .then((result) => {
+      broadcastTaskEvent(taskId, "done", {
+        status: result.success ? "completed" : "failed",
+        result: result.result,
+        tokensUsed: result.tokensUsed,
+      });
+    })
+    .catch((err) => {
+      broadcastTaskEvent(taskId, "done", {
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
-  }, selectedModel, images).then((result) => {
-    broadcastTaskEvent(taskId, "done", {
-      status: result.success ? "completed" : "failed",
-      result: result.result,
-      tokensUsed: result.tokensUsed,
-    });
-  }).catch((err) => {
-    broadcastTaskEvent(taskId, "done", {
-      status: "failed",
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
 });
 
 router.get("/tools", (_req: Request, res: Response) => {
@@ -444,6 +505,8 @@ router.get("/tools", (_req: Request, res: Response) => {
   }));
   res.json({ tools, count: tools.length });
 });
+
+// ─── Orchestration ────────────────────────────────────────────────────────────
 
 const OrchestrationBody = z.object({
   sessionId: z.string().uuid(),
@@ -459,15 +522,21 @@ router.post("/orchestrate", async (req: Request, res: Response) => {
   }
 
   const { sessionId, goal, maxAgents = 4 } = parsed.data;
+  const userId = getSessionUserId(req);
 
-  const sessionRows = await db
+  const [session] = await db
     .select()
     .from(agentSessionsTable)
     .where(eq(agentSessionsTable.sessionId, sessionId))
     .limit(1);
 
-  if (!sessionRows.length) {
+  if (!session) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -493,7 +562,7 @@ router.post("/orchestrate", async (req: Request, res: Response) => {
   });
 
   orchestrate(orchestrationId, sessionId, goal, maxAgents).catch((err: unknown) => {
-    console.error("Orchestration failed:", err);
+    req.log.error({ err, orchestrationId }, "Orchestration failed");
   });
 });
 
@@ -505,15 +574,21 @@ router.post("/orchestrate/sync", async (req: Request, res: Response) => {
   }
 
   const { sessionId, goal, maxAgents = 4 } = parsed.data;
+  const userId = getSessionUserId(req);
 
-  const sessionRows = await db
+  const [session] = await db
     .select()
     .from(agentSessionsTable)
     .where(eq(agentSessionsTable.sessionId, sessionId))
     .limit(1);
 
-  if (!sessionRows.length) {
+  if (!session) {
     res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.userId !== null && userId !== session.userId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 

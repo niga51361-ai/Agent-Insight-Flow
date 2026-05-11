@@ -5,17 +5,7 @@ import { eq } from "drizzle-orm";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { MemoryManager } from "../memory/manager.js";
 import { logger } from "../../lib/logger.js";
-
-let _openaiInstance: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openaiInstance) {
-    _openaiInstance = new OpenAI({
-      apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
-      baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
-    });
-  }
-  return _openaiInstance;
-}
+import { getOpenAI } from "../../lib/openai.js";
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are Zanix ⚡, an elite autonomous AI agent built by Zanix AI. You are fast, brilliant, and highly capable — the smartest AI assistant available.
@@ -91,18 +81,28 @@ export interface StepEvent {
 export interface RunResult {
   success: boolean;
   result: string;
-  steps: Array<{ thought: string; toolName: string; toolInput: Record<string, unknown>; observation: string }>;
+  steps: Array<{
+    thought: string;
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    observation: string;
+  }>;
   artifacts: Array<{ name: string; type: string; content: string }>;
   tokensUsed: number;
 }
 
 // Tools that receive sessionId injected by the runner
-const SESSION_TOOLS = new Set(["store_memory", "search_memory", "semantic_search_memory", "semantic_store_memory"]);
+const SESSION_TOOLS = new Set([
+  "store_memory",
+  "search_memory",
+  "semantic_search_memory",
+  "semantic_store_memory",
+]);
 
 // Tools that receive taskId injected by the runner
 const TASK_TOOLS = new Set(["save_file", "list_files"]);
 
-// ─── Main runner ──────────────────────────────────────────────────────────────
+// ─── Main Runner ──────────────────────────────────────────────────────────────
 export async function runAgent(
   taskId: string,
   sessionId: string,
@@ -121,7 +121,9 @@ export async function runAgent(
   const memorySnapshot = memory.getLocalSnapshot();
   const memoryContext =
     Object.keys(memorySnapshot).length > 0
-      ? `\n\n[Session Memory]\n${Object.entries(memorySnapshot).map(([k, v]) => `• ${k}: ${v}`).join("\n")}`
+      ? `\n\n[Session Memory]\n${Object.entries(memorySnapshot)
+          .map(([k, v]) => `• ${k}: ${v}`)
+          .join("\n")}`
       : "";
 
   const userContent: OpenAI.ChatCompletionContentPart[] = [
@@ -130,7 +132,10 @@ export async function runAgent(
 
   if (images && images.length > 0) {
     for (const img of images) {
-      userContent.push({ type: "image_url", image_url: { url: img, detail: "high" } });
+      userContent.push({
+        type: "image_url",
+        image_url: { url: img, detail: "high" },
+      });
     }
   }
 
@@ -184,7 +189,12 @@ export async function runAgent(
 
       await db
         .update(agentTasksTable)
-        .set({ status: "completed", result: finalText, updatedAt: new Date(), completedAt: new Date() })
+        .set({
+          status: "completed",
+          result: finalText,
+          updatedAt: new Date(),
+          completedAt: new Date(),
+        })
         .where(eq(agentTasksTable.taskId, taskId));
 
       return { success: true, result: finalText, steps, artifacts, tokensUsed: totalTokens };
@@ -197,14 +207,17 @@ export async function runAgent(
       let toolInput: Record<string, unknown> = {};
 
       try {
-        toolInput = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+        toolInput = JSON.parse(toolCall.function.arguments) as Record<
+          string,
+          unknown
+        >;
       } catch {
         toolInput = {};
       }
 
       // Inject context params — the agent doesn't need to know these
       if (SESSION_TOOLS.has(toolName)) toolInput.sessionId = sessionId;
-      if (TASK_TOOLS.has(toolName))   toolInput.taskId    = taskId;
+      if (TASK_TOOLS.has(toolName)) toolInput.taskId = taskId;
 
       const tool = registry.get(toolName);
       if (!tool) {
@@ -212,7 +225,9 @@ export async function runAgent(
         toolResults.push({
           role: "tool",
           tool_call_id: toolCall.id,
-          content: JSON.stringify({ error: `Tool '${toolName}' not found. Available: ${available}` }),
+          content: JSON.stringify({
+            error: `Tool '${toolName}' not found. Available: ${available}`,
+          }),
         });
         continue;
       }
@@ -283,29 +298,47 @@ export async function runAgent(
       // Collect artifacts from file saves
       if (toolResult.success && toolName === "save_file" && toolInput.content) {
         artifacts.push({
-          name:    String(toolInput.name ?? "file"),
-          type:    String(toolInput.artifactType ?? "text"),
+          name: String(toolInput.name ?? "file"),
+          type: String(toolInput.artifactType ?? "text"),
           content: String(toolInput.content),
         });
       }
 
       // Collect artifacts from website builder
-      if (toolResult.success && toolName === "build_website" && toolResult.output) {
-        const out = toolResult.output as { files?: Array<{ filename: string; content: string }> };
+      if (
+        toolResult.success &&
+        toolName === "build_website" &&
+        toolResult.output
+      ) {
+        const out = toolResult.output as {
+          files?: Array<{ filename: string; content: string }>;
+        };
         if (out.files) {
           for (const f of out.files) {
-            artifacts.push({ name: f.filename, type: f.filename.split(".").pop() ?? "text", content: f.content });
+            artifacts.push({
+              name: f.filename,
+              type: f.filename.split(".").pop() ?? "text",
+              content: f.content,
+            });
           }
         }
       }
 
       // Collect image artifacts
-      if (toolResult.success && toolName === "generate_image" && toolResult.output) {
-        const out = toolResult.output as { imageUrl?: string; b64?: string; prompt?: string };
+      if (
+        toolResult.success &&
+        toolName === "generate_image" &&
+        toolResult.output
+      ) {
+        const out = toolResult.output as {
+          imageUrl?: string;
+          b64?: string;
+          prompt?: string;
+        };
         if (out.imageUrl || out.b64) {
           artifacts.push({
-            name:    `image-${stepIndex}.png`,
-            type:    "image",
+            name: `image-${stepIndex}.png`,
+            type: "image",
             content: out.imageUrl ?? `data:image/png;base64,${out.b64}`,
           });
         }
@@ -321,11 +354,23 @@ export async function runAgent(
     messages.push(...toolResults);
   }
 
-  const timeoutMsg = "⚠️ Task reached maximum iteration depth. Partial results were produced.";
+  const timeoutMsg =
+    "⚠️ Task reached maximum iteration depth. Partial results were produced.";
   await db
     .update(agentTasksTable)
-    .set({ status: "completed", result: timeoutMsg, updatedAt: new Date(), completedAt: new Date() })
+    .set({
+      status: "completed",
+      result: timeoutMsg,
+      updatedAt: new Date(),
+      completedAt: new Date(),
+    })
     .where(eq(agentTasksTable.taskId, taskId));
 
-  return { success: true, result: timeoutMsg, steps, artifacts, tokensUsed: totalTokens };
+  return {
+    success: true,
+    result: timeoutMsg,
+    steps,
+    artifacts,
+    tokensUsed: totalTokens,
+  };
 }
